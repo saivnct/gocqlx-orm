@@ -7,6 +7,7 @@ import (
 	"github.com/gocql/gocql"
 	"log"
 	"testing"
+	"time"
 )
 
 func TestExample01(t *testing.T) {
@@ -27,7 +28,7 @@ func TestExample01(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		CleanUp(session, keyspace)
+		//CleanUp(session, keyspace)
 		session.Close()
 	}()
 
@@ -150,4 +151,54 @@ func TestExample01(t *testing.T) {
 		return
 	}
 	AssertEqual(t, count, 1)
+
+	person := Person{
+		Id:        gocql.TimeUUID(),
+		LastName:  "test",
+		FirstName: "test2",
+		FavoritePlace: FavoritePlace{
+			Place: LandMark{
+				City:       "HCM",
+				Country:    "VN",
+				Population: 0,
+				CheckPoint: []string{"1", "2", "3"},
+			},
+			Rating: 5,
+		},
+		Email:          "test@test.com",
+		StaticIP:       "127.0.0.1",
+		Nicknames:      []string{"test", "test2", "test3"},
+		WorkingHistory: nil,
+		WorkingDocuments: []WorkingDoc{
+			{
+				Name:      "WorkingDoc1",
+				CreatedAt: time.Now(),
+			},
+		},
+		CitizenIdent: CitizenIdent{
+			Id:        gocql.TimeUUID().String(),
+			EndAt:     time.Now(),
+			CreatedAt: time.Now(),
+			Level:     8,
+		},
+		CreatedAt: time.Now(),
+	}
+
+	q := session.Query(personDAO.EntityInfo.Table.Insert()).BindStruct(person)
+	err = q.ExecRelease()
+
+	//err = personDAO.Insert(session, person)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	//var persons []Person
+	//err = personDAO.FindAll(session, &persons)
+	//if err != nil {
+	//	t.Errorf(err.Error())
+	//	return
+	//}
+	//
+	//log.Println("persons", persons)
 }

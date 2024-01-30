@@ -157,14 +157,17 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		}
 	}
 
+	tableMetaData := table.Metadata{
+		Name:    tableName,
+		Columns: sliceUtils.Map(columns, func(c ColumnInfo) string { return c.Name }),
+		PartKey: pkeys,
+		SortKey: ckeys,
+	}
+
 	entityInfo = EntityInfo{
-		TableMetaData: table.Metadata{
-			Name:    tableName,
-			Columns: sliceUtils.Map(columns, func(c ColumnInfo) string { return c.Name }),
-			PartKey: pkeys,
-			SortKey: ckeys,
-		},
-		Columns: columns,
+		TableMetaData: tableMetaData,
+		Table:         table.New(tableMetaData),
+		Columns:       columns,
 	}
 
 	return entityInfo, nil

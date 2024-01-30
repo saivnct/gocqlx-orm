@@ -10,6 +10,7 @@ import (
 
 type EntityInfo struct {
 	TableMetaData table.Metadata
+	Table         *table.Table
 	Columns       []ColumnInfo
 }
 

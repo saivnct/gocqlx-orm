@@ -5,6 +5,8 @@ import (
 	"giangbb.studio/go.cqlx.orm/entity"
 	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"github.com/scylladb/gocqlx/v2"
+	"github.com/scylladb/gocqlx/v2/qb"
+	"log"
 )
 
 type DAO struct {
@@ -51,10 +53,14 @@ func (d *DAO) CheckAndCreateTable(session gocqlx.Session) error {
 	return err
 }
 
-//
-//func (d *DAO) FindAll(session gocqlx.Session) ([]entity.BaseModelInterface, error) {
-//	var rs []entity.BaseModelInterface
-//	q := qb.Select(d.TableMetaData.Name).Columns(d.TableMetaData.Columns...).Query(session)
-//	err := q.Select(&rs)
-//	return rs, err
-//}
+func (d *DAO) Insert(session gocqlx.Session, entity cqlxoEntity.BaseModelInterface) error {
+	q := session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
+	log.Printf("Insert %s", q.String())
+	return q.ExecRelease()
+}
+
+func (d *DAO) FindAll(session gocqlx.Session, result interface{}) error {
+	q := qb.Select(d.EntityInfo.TableMetaData.Name).Columns(d.EntityInfo.TableMetaData.Columns...).Query(session)
+	err := q.Select(result)
+	return err
+}
