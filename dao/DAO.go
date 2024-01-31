@@ -53,9 +53,9 @@ func (d *DAO) CheckAndCreateTable(session gocqlx.Session) error {
 	return err
 }
 
-func (d *DAO) Insert(session gocqlx.Session, entity cqlxoEntity.BaseModelInterface) error {
+func (d *DAO) Save(session gocqlx.Session, entity cqlxoEntity.BaseModelInterface) error {
 	q := session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
-	log.Printf("Insert %s", q.String())
+	log.Printf("Save %s", q.String())
 	return q.ExecRelease()
 }
 

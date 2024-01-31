@@ -38,7 +38,7 @@ func SetUpKeySpace(keyspace string) error {
 	session := *sessionP
 	defer session.Close()
 
-	err = session.ExecStmt(fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'NetworkTopologyStrategy', 'replication_factor' : 1}", keyspace))
+	err = session.ExecStmt(fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}", keyspace))
 
 	return err
 }

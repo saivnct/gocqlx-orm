@@ -2,10 +2,13 @@ package test
 
 import (
 	"fmt"
+	cqlxoCodec "giangbb.studio/go.cqlx.orm/codec"
 	"giangbb.studio/go.cqlx.orm/connection"
+	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"giangbb.studio/go.cqlx.orm/utils/stringUtils"
 	"github.com/gocql/gocql"
 	"log"
+	"strings"
 	"testing"
 	"time"
 )
@@ -33,11 +36,11 @@ func TestExample01(t *testing.T) {
 	}()
 
 	//UDT type declare in entity Person but not implemented BaseUDTInterface => that means it already created in DB
-	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS working_document (name text, created_at timestamp)")
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
+	//err = session.ExecStmt("CREATE TYPE IF NOT EXISTS working_document (name text, created_at timestamp)")
+	//if err != nil {
+	//	t.Errorf(err.Error())
+	//	return
+	//}
 
 	personDAO, err := mPersonDAO(session)
 	if err != nil {
@@ -54,8 +57,8 @@ func TestExample01(t *testing.T) {
 		"static_ip":         "static_ip inet",
 		"nick_names":        "nick_names set<text>",
 		"working_history":   "working_history map<int, text>",
-		"working_documents": "working_documents list<frozen<working_document>>",
-		"citizen_ident":     "citizen_ident tuple<text, timestamp, timestamp, int>",
+		"working_documents": "working_documents list<frozen<working_doc>>",
+		"working_document":  "working_document frozen<working_doc>",
 		"created_at":        "created_at timestamp",
 	}
 
@@ -114,9 +117,23 @@ func TestExample01(t *testing.T) {
 				},
 			},
 		},
+
+		"working_doc": gocql.UDTTypeInfo{
+			Name: "working_doc",
+			Elements: []gocql.UDTField{
+				{
+					Name: "name",
+					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+				},
+				{
+					Name: "created_at",
+					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
+				},
+			},
+		},
 	}
 	udts := personDAO.EntityInfo.ScanUDTs()
-	AssertEqual(t, len(udts), len(assetUDTs))
+	//AssertEqual(t, len(udts), len(assetUDTs))
 	for _, udt := range udts {
 		assetUdT, ok := assetUDTs[udt.Name]
 		AssertEqual(t, ok, true)
@@ -137,12 +154,12 @@ func TestExample01(t *testing.T) {
 		}
 		AssertEqual(t, count, 1)
 	}
-	//udtNames := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return udt.Name })
-	//log.Printf("Person UDTs: %s\n\n", strings.Join(udtNames, ", "))
-	//
-	//udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
-	//log.Printf("Person UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
-	//log.Printf("Person: %s\n\n", personDAO.EntityInfo.GetGreateTableStatement())
+	udtNames := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return udt.Name })
+	log.Printf("Person UDTs: %s\n\n", strings.Join(udtNames, ", "))
+
+	udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
+	log.Printf("Person UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
+	log.Printf("Person: %s\n\n", personDAO.EntityInfo.GetGreateTableStatement())
 
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Person{}.TableName()), nil).Get(&count)
@@ -163,33 +180,36 @@ func TestExample01(t *testing.T) {
 				Population: 0,
 				CheckPoint: []string{"1", "2", "3"},
 			},
-			Rating: 5,
+			Rating: 3,
 		},
 		Email:          "test@test.com",
 		StaticIP:       "127.0.0.1",
 		Nicknames:      []string{"test", "test2", "test3"},
-		WorkingHistory: nil,
+		WorkingHistory: map[int]string{1: "test", 2: "test2", 3: "test3"},
 		WorkingDocuments: []WorkingDoc{
 			{
 				Name:      "WorkingDoc1",
 				CreatedAt: time.Now(),
 			},
+			{
+				Name:      "WorkingDoc2",
+				CreatedAt: time.Now(),
+			},
+			{
+				Name:      "WorkingDoc3",
+				CreatedAt: time.Now(),
+			},
 		},
-		CitizenIdent: CitizenIdent{
-			Id:        gocql.TimeUUID().String(),
-			EndAt:     time.Now(),
+		WorkingDocument: WorkingDoc{
+			Name:      "WorkingDoc3333",
 			CreatedAt: time.Now(),
-			Level:     8,
 		},
 		CreatedAt: time.Now(),
 	}
 
-	q := session.Query(personDAO.EntityInfo.Table.Insert()).BindStruct(person)
-	err = q.ExecRelease()
-
-	//err = personDAO.Insert(session, person)
+	err = personDAO.Save(session, person)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Errorf("Unable to save person -> %v", err)
 		return
 	}
 

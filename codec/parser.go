@@ -83,7 +83,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			}
 
 			if !validateFieldType(field.Type, cqlType) {
-				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> %w", NotMatchTypesErr, tableName, field.Name, err)
+				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s", NotMatchTypesErr, tableName, field.Name)
 			}
 		}
 

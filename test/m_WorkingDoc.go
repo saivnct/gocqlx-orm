@@ -1,8 +1,12 @@
 package test
 
-import "time"
+import (
+	"github.com/scylladb/gocqlx/v2"
+	"time"
+)
 
 type WorkingDoc struct {
+	gocqlx.UDT
 	Name      string
 	CreatedAt time.Time
 }

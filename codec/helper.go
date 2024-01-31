@@ -57,10 +57,15 @@ func GetCqlTypeDeclareStatement(cqlType gocql.TypeInfo, isChild bool) string {
 		for _, elem := range cqlTuple.Elems {
 			elemTypStrs = append(elemTypStrs, GetCqlTypeDeclareStatement(elem, true))
 		}
-		fmt.Fprintf(buf, "%s<%s>", cqlTuple.NativeType.Type().String(), strings.Join(elemTypStrs, ", "))
+		fmt.Fprintf(buf, "frozen<%s<%s>>", cqlTuple.NativeType.Type().String(), strings.Join(elemTypStrs, ", "))
 	} else {
 		if cqlType.Type() == gocql.TypeCustom {
-			fmt.Fprintf(buf, "frozen<%s>", cqlType.Custom())
+			if isChild {
+				fmt.Fprintf(buf, "frozen<%s>", cqlType.Custom())
+			} else {
+				fmt.Fprintf(buf, "%s", cqlType.Custom())
+			}
+
 		} else {
 			fmt.Fprintf(buf, "%s", cqlType.Type().String())
 		}
