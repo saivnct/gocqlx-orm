@@ -3,7 +3,7 @@ package test
 import (
 	"fmt"
 	cqlxo_connection "giangbb.studio/go.cqlx.orm/connection"
-	"github.com/scylladb/gocqlx/v2"
+	"github.com/gocql/gocql"
 	"os"
 	"testing"
 )
@@ -31,20 +31,19 @@ func CloseTestEnv() {
 }
 
 func SetUpKeySpace(keyspace string) error {
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "", localDC, clusterTimeout, numRetries)
+	_, session, err := cqlxo_connection.CreateCluster(hosts, "", localDC, clusterTimeout, numRetries)
 	if err != nil {
 		return err
 	}
-	session := *sessionP
 	defer session.Close()
 
-	err = session.ExecStmt(fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}", keyspace))
+	err = session.Query(fmt.Sprintf("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 1}", keyspace)).Exec()
 
 	return err
 }
 
-func CleanUp(session gocqlx.Session, keyspace string) {
-	session.ExecStmt(fmt.Sprintf("DROP KEYSPACE %s", keyspace))
+func CleanUp(session *gocql.Session, keyspace string) {
+	session.Query(fmt.Sprintf("DROP KEYSPACE %s", keyspace)).Exec()
 }
 
 func AssertEqual(t *testing.T, x, y interface{}) {

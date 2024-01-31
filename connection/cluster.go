@@ -1,13 +1,11 @@
 package cqlxo_connection
 
 import (
-	"github.com/scylladb/gocqlx/v2"
-	"time"
-
 	"github.com/gocql/gocql"
+	"time"
 )
 
-func CreateCluster(hosts []string, keyspace string, localDC string, clusterTimeout int, numRetries int) (*gocql.ClusterConfig, *gocqlx.Session, error) {
+func CreateCluster(hosts []string, keyspace string, localDC string, clusterTimeout int, numRetries int) (*gocql.ClusterConfig, *gocql.Session, error) {
 	retryPolicy := &gocql.ExponentialBackoffRetryPolicy{
 		Min:        time.Second,
 		Max:        10 * time.Second,
@@ -29,11 +27,10 @@ func CreateCluster(hosts []string, keyspace string, localDC string, clusterTimeo
 		cluster.Consistency = gocql.Quorum
 		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
 	}
-
-	session, err := gocqlx.WrapSession(cluster.CreateSession())
+	session, err := cluster.CreateSession()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return cluster, &session, nil
+	return cluster, session, nil
 }

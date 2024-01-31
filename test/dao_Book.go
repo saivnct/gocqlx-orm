@@ -2,14 +2,14 @@ package test
 
 import (
 	cqlxoDAO "giangbb.studio/go.cqlx.orm/dao"
-	"github.com/scylladb/gocqlx/v2"
+	"github.com/gocql/gocql"
 )
 
 type BookDAO struct {
 	cqlxoDAO.DAO
 }
 
-func mBookDAO(session gocqlx.Session) (*BookDAO, error) {
+func mBookDAO(session *gocql.Session) (*BookDAO, error) {
 	d := &BookDAO{}
 	err := d.InitDAO(session, Book{})
 

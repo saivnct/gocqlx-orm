@@ -1,8 +1,10 @@
 package stringUtils
 
 import (
+	"fmt"
 	"github.com/gocql/gocql"
 	"math/rand"
+	"strings"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -40,4 +42,12 @@ func CompareSlicesOrdered(slice1, slice2 []string) bool {
 	}
 
 	return true
+}
+
+func GenerateCQLQuestionMarks(n int) string {
+	marks := make([]string, n)
+	for i := range marks {
+		marks[i] = "?"
+	}
+	return fmt.Sprintf("%s", strings.Join(marks, ", "))
 }

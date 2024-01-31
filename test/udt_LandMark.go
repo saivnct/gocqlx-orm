@@ -1,9 +1,11 @@
 package test
 
-import "github.com/scylladb/gocqlx/v2"
+import (
+	"giangbb.studio/go.cqlx.orm/entity"
+)
 
 type LandMark struct {
-	gocqlx.UDT
+	cqlxoEntity.UDT
 	City       string   `db:"city"`
 	Country    string   `db:"country"`
 	Population int64    `db:"population"`

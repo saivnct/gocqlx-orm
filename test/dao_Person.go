@@ -2,14 +2,14 @@ package test
 
 import (
 	cqlxoDAO "giangbb.studio/go.cqlx.orm/dao"
-	"github.com/scylladb/gocqlx/v2"
+	"github.com/gocql/gocql"
 )
 
 type PersonDAO struct {
 	cqlxoDAO.DAO
 }
 
-func mPersonDAO(session gocqlx.Session) (*PersonDAO, error) {
+func mPersonDAO(session *gocql.Session) (*PersonDAO, error) {
 	d := &PersonDAO{}
 	err := d.InitDAO(session, Person{})
 

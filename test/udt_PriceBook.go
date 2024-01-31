@@ -1,12 +1,12 @@
 package test
 
 import (
+	"giangbb.studio/go.cqlx.orm/entity"
 	"github.com/gocql/gocql"
-	"github.com/scylladb/gocqlx/v2"
 )
 
 type PriceBook struct {
-	gocqlx.UDT
+	cqlxoEntity.UDT
 	Id   gocql.UUID
 	Name string
 	Year int

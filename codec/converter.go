@@ -5,7 +5,6 @@ import (
 	"giangbb.studio/go.cqlx.orm/entity"
 	"github.com/gocql/gocql"
 	"github.com/scylladb/go-reflectx"
-	"github.com/scylladb/gocqlx/v2"
 	"gopkg.in/inf.v0"
 	"math/big"
 	"reflect"
@@ -74,9 +73,9 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 				typeInfo.Key = keyTypeInfo
 				typeInfo.Elem = elemTypeInfo
 				return *typeInfo, nil
-			} else if t.Implements(reflect.TypeOf((*gocqlx.UDT)(nil)).Elem()) {
+			} else if t.Implements(reflect.TypeOf((*cqlxoEntity.UDT)(nil)).Elem()) {
 				var tVal reflect.Value = reflect.New(t)
-				if baseUDT, ok := tVal.Elem().Interface().(gocqlx.UDT); ok {
+				if baseUDT, ok := tVal.Elem().Interface().(cqlxoEntity.UDT); ok {
 					typeInfo := &gocql.UDTTypeInfo{
 						NativeType: gocql.NewNativeType(5, gocql.TypeUDT, ""),
 						Name:       reflectx.CamelToSnakeASCII(t.Name()),
@@ -110,7 +109,7 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 }
 
 // convertToCqlUDT - Convert from go UDT type to CQL UDT Fields type
-func convertToCqlUDT(m gocqlx.UDT) ([]gocql.UDTField, error) {
+func convertToCqlUDT(m cqlxoEntity.UDT) ([]gocql.UDTField, error) {
 	t := reflect.TypeOf(m)
 
 	var udtFields []gocql.UDTField
@@ -127,8 +126,8 @@ func convertToCqlUDT(m gocqlx.UDT) ([]gocql.UDTField, error) {
 			continue
 		}
 
-		//ignore gocqlx.UDT field
-		if field.Type.Implements(reflect.TypeOf((*gocqlx.UDT)(nil)).Elem()) && field.Name == "UDT" {
+		//ignore cqlxoEntity.UDT field
+		if field.Type.Implements(reflect.TypeOf((*cqlxoEntity.UDT)(nil)).Elem()) && field.Name == "UDT" {
 			continue
 		}
 

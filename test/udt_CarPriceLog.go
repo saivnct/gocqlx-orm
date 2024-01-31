@@ -1,12 +1,12 @@
 package test
 
 import (
-	"github.com/scylladb/gocqlx/v2"
+	"giangbb.studio/go.cqlx.orm/entity"
 	"time"
 )
 
 type CarPriceLog struct {
-	gocqlx.UDT
+	cqlxoEntity.UDT
 	Price     float64   `db:"price"`
 	PriceBook PriceBook `db:"price_book"`
 	CreatedAt time.Time `db:"created_at"`

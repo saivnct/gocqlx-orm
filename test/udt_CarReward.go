@@ -1,9 +1,11 @@
 package test
 
-import "github.com/scylladb/gocqlx/v2"
+import (
+	"giangbb.studio/go.cqlx.orm/entity"
+)
 
 type CarReward struct {
-	gocqlx.UDT
+	cqlxoEntity.UDT
 	Name   string  `db:"name"`
 	Cert   string  `db:"cert"`
 	Reward float64 `db:"reward"`

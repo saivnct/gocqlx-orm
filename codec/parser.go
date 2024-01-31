@@ -7,7 +7,6 @@ import (
 	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"github.com/gocql/gocql"
 	"github.com/scylladb/go-reflectx"
-	"github.com/scylladb/gocqlx/v2/table"
 	"reflect"
 	"slices"
 	"strconv"
@@ -46,6 +45,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 
 	//var columns []string
 	var columns []ColumnInfo
+	columnsMap := map[string]ColumnInfo{}
 
 	pKeyMap := map[int]string{}
 	cKeyMap := map[int]string{}
@@ -95,10 +95,12 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			return entityInfo, fmt.Errorf("%w -> table: %s, column name: %s", ConflictColumnNameErr, tableName, colName)
 		}
 
-		columns = append(columns, ColumnInfo{
+		col := ColumnInfo{
 			Name: colName,
 			Type: cqlType,
-		})
+		}
+		columns = append(columns, col)
+		columnsMap[field.Name] = col
 
 		pk := strings.TrimSpace(field.Tag.Get("pk"))
 		if len(pk) > 0 {
@@ -157,17 +159,14 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		}
 	}
 
-	tableMetaData := table.Metadata{
-		Name:    tableName,
-		Columns: sliceUtils.Map(columns, func(c ColumnInfo) string { return c.Name }),
-		PartKey: pkeys,
-		SortKey: ckeys,
-	}
+	columnsName := sliceUtils.Map(columns, func(c ColumnInfo) string { return c.Name })
 
 	entityInfo = EntityInfo{
-		TableMetaData: tableMetaData,
-		Table:         table.New(tableMetaData),
-		Columns:       columns,
+		TableName:   tableName,
+		Columns:     columns,
+		ColumnsName: columnsName,
+		PartKey:     pkeys,
+		SortKey:     ckeys,
 	}
 
 	return entityInfo, nil
