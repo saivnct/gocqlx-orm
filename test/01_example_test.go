@@ -31,16 +31,16 @@ func TestExample01(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		//CleanUp(session, keyspace)
+		CleanUp(session, keyspace)
 		session.Close()
 	}()
 
 	//UDT type declare in entity Person but not implemented BaseUDTInterface => that means it already created in DB
-	//err = session.ExecStmt("CREATE TYPE IF NOT EXISTS working_document (name text, created_at timestamp)")
-	//if err != nil {
-	//	t.Errorf(err.Error())
-	//	return
-	//}
+	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS citizen_id (id text, end_at timestamp, created_at timestamp, level int)")
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
 
 	personDAO, err := mPersonDAO(session)
 	if err != nil {
@@ -49,17 +49,16 @@ func TestExample01(t *testing.T) {
 	}
 
 	assetCols := map[string]string{
-		"id":                "id timeuuid",
-		"last_name":         "last_name text",
-		"first_name":        "first_name text",
-		"favorite_place":    "favorite_place frozen<favorite_place>",
-		"email":             "email text",
-		"static_ip":         "static_ip inet",
-		"nick_names":        "nick_names set<text>",
-		"working_history":   "working_history map<int, text>",
-		"working_documents": "working_documents list<frozen<working_doc>>",
-		"working_document":  "working_document frozen<working_doc>",
-		"created_at":        "created_at timestamp",
+		"id":              "id timeuuid",
+		"last_name":       "last_name text",
+		"first_name":      "first_name text",
+		"favorite_place":  "favorite_place frozen<favorite_place>",
+		"email":           "email text",
+		"static_ip":       "static_ip inet",
+		"nick_names":      "nick_names set<text>",
+		"working_history": "working_history map<int, text>",
+		"citizen_ident":   "citizen_ident citizen_id",
+		"created_at":      "created_at timestamp",
 	}
 
 	AssertEqual(t, len(personDAO.EntityInfo.Columns), len(assetCols))
@@ -84,19 +83,6 @@ func TestExample01(t *testing.T) {
 			Name: "favorite_place",
 			Elements: []gocql.UDTField{
 				{
-					Name: "land_mark",
-					Type: gocql.NewNativeType(5, gocql.TypeUDT, ""),
-				},
-				{
-					Name: "rating",
-					Type: gocql.NewNativeType(5, gocql.TypeInt, ""),
-				},
-			},
-		},
-		"land_mark": gocql.UDTTypeInfo{
-			Name: "land_mark",
-			Elements: []gocql.UDTField{
-				{
 					Name: "city",
 					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
 				},
@@ -110,24 +96,32 @@ func TestExample01(t *testing.T) {
 				},
 				{
 					Name: "check_point",
-					Type: gocql.CollectionType{
-						NativeType: gocql.NewNativeType(5, gocql.TypeList, ""),
-						Elem:       gocql.NewNativeType(5, gocql.TypeText, ""),
-					},
+					Type: gocql.NewNativeType(5, gocql.TypeList, ""),
+				},
+				{
+					Name: "rating",
+					Type: gocql.NewNativeType(5, gocql.TypeInt, ""),
 				},
 			},
 		},
-
-		"working_doc": gocql.UDTTypeInfo{
-			Name: "working_doc",
+		"citizen_id": gocql.UDTTypeInfo{
+			Name: "citizen_id",
 			Elements: []gocql.UDTField{
 				{
-					Name: "name",
+					Name: "id",
 					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+				},
+				{
+					Name: "end_at",
+					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
 				},
 				{
 					Name: "created_at",
 					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
+				},
+				{
+					Name: "level",
+					Type: gocql.NewNativeType(5, gocql.TypeInt, ""),
 				},
 			},
 		},
@@ -174,35 +168,21 @@ func TestExample01(t *testing.T) {
 		LastName:  "test",
 		FirstName: "test2",
 		FavoritePlace: FavoritePlace{
-			Place: LandMark{
-				City:       "HCM",
-				Country:    "VN",
-				Population: 0,
-				CheckPoint: []string{"1", "2", "3"},
-			},
-			Rating: 3,
+			City:       "HCM",
+			Country:    "VN",
+			Population: 0,
+			CheckPoint: []string{"1", "2", "3"},
+			Rating:     3,
 		},
 		Email:          "test@test.com",
 		StaticIP:       "127.0.0.1",
 		Nicknames:      []string{"test", "test2", "test3"},
 		WorkingHistory: map[int]string{1: "test", 2: "test2", 3: "test3"},
-		WorkingDocuments: []WorkingDoc{
-			{
-				Name:      "WorkingDoc1",
-				CreatedAt: time.Now(),
-			},
-			{
-				Name:      "WorkingDoc2",
-				CreatedAt: time.Now(),
-			},
-			{
-				Name:      "WorkingDoc3",
-				CreatedAt: time.Now(),
-			},
-		},
-		WorkingDocument: WorkingDoc{
-			Name:      "WorkingDoc3333",
-			CreatedAt: time.Now(),
+		CitizenIdent: CitizenIdent{
+			Id:        gocql.TimeUUID().String(),
+			EndAt:     time.Time{},
+			CreatedAt: time.Time{},
+			Level:     10,
 		},
 		CreatedAt: time.Now(),
 	}
@@ -213,12 +193,12 @@ func TestExample01(t *testing.T) {
 		return
 	}
 
-	//var persons []Person
-	//err = personDAO.FindAll(session, &persons)
-	//if err != nil {
-	//	t.Errorf(err.Error())
-	//	return
-	//}
-	//
-	//log.Println("persons", persons)
+	var persons []Person
+	err = personDAO.FindAll(session, &persons)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	log.Println("persons", persons)
 }

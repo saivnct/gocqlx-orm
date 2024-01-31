@@ -51,13 +51,22 @@ func GetCqlTypeDeclareStatement(cqlType gocql.TypeInfo, isChild bool) string {
 		}
 
 	} else if cqlUDT, ok := cqlType.(gocql.UDTTypeInfo); ok {
-		fmt.Fprintf(buf, "frozen<%s>", cqlUDT.Name)
+		if isChild {
+			fmt.Fprintf(buf, "frozen<%s>", cqlUDT.Name)
+		} else {
+			fmt.Fprintf(buf, "%s", cqlUDT.Name)
+		}
 	} else if cqlTuple, ok := cqlType.(gocql.TupleTypeInfo); ok {
 		var elemTypStrs []string
 		for _, elem := range cqlTuple.Elems {
 			elemTypStrs = append(elemTypStrs, GetCqlTypeDeclareStatement(elem, true))
 		}
-		fmt.Fprintf(buf, "frozen<%s<%s>>", cqlTuple.NativeType.Type().String(), strings.Join(elemTypStrs, ", "))
+
+		if isChild {
+			fmt.Fprintf(buf, "frozen<%s<%s>>", cqlTuple.NativeType.Type().String(), strings.Join(elemTypStrs, ", "))
+		} else {
+			fmt.Fprintf(buf, "%s<%s>", cqlTuple.NativeType.Type().String(), strings.Join(elemTypStrs, ", "))
+		}
 	} else {
 		if cqlType.Type() == gocql.TypeCustom {
 			if isChild {

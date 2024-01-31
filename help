@@ -1,0 +1,5 @@
+Not supporting:
+- Tuple
+- nested UDT
+- collection (list, set, map) of UDT
+

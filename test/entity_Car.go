@@ -11,12 +11,11 @@ type Car struct {
 	Year                int                    `db:"year" ck:"1"`
 	Colors              []string               `db:"colors"`
 	PriceLogs           []CarPriceLog          `db:"price_logs"`
-	Rewards             map[int]CarReward      `db:"rewards"` //year - reward
+	Reward              CarReward              `db:"reward"` //year - reward
 	Matrix              [][]int                `db:"matrix"`
 	Levels              []int                  `db:"levels"`
 	Distributions       map[string]int         `db:"distributions"` //country - amount
 	MatrixMap           map[string][][]float64 `db:"matrix_map"`    //country - [][]
-	Machine             MachineTuple           //not declare db:"machine" -> default db:"machine"
 	ThisIgnoreField     string                 `db:"-"`
 	thisUnexportedField string
 }

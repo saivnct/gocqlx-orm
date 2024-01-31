@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	hosts          = []string{"192.168.31.41"}
+	hosts          = []string{"172.16.45.204"}
 	clusterTimeout = 10
 	numRetries     = 5
 	localDC        = ""

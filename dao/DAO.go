@@ -6,7 +6,6 @@ import (
 	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"github.com/scylladb/gocqlx/v2"
 	"github.com/scylladb/gocqlx/v2/qb"
-	"log"
 )
 
 type DAO struct {
@@ -40,6 +39,7 @@ func (d *DAO) CheckAndCreateUDT(session gocqlx.Session) error {
 	udts = sliceUtils.Reverse(udts)
 
 	for _, udt := range udts {
+		//log.Println(cqlxoCodec.GetCqlCreateUDTStatement(udt))
 		err := session.ExecStmt(cqlxoCodec.GetCqlCreateUDTStatement(udt))
 		if err != nil {
 			return err
@@ -49,13 +49,14 @@ func (d *DAO) CheckAndCreateUDT(session gocqlx.Session) error {
 }
 
 func (d *DAO) CheckAndCreateTable(session gocqlx.Session) error {
+	//log.Println(d.EntityInfo.GetGreateTableStatement())
 	err := session.ExecStmt(d.EntityInfo.GetGreateTableStatement())
 	return err
 }
 
 func (d *DAO) Save(session gocqlx.Session, entity cqlxoEntity.BaseModelInterface) error {
 	q := session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
-	log.Printf("Save %s", q.String())
+	//log.Printf("Save %s", q.String())
 	return q.ExecRelease()
 }
 

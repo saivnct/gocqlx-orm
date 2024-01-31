@@ -47,12 +47,11 @@ func TestExample02(t *testing.T) {
 		"year":          "year int",
 		"colors":        "colors list<text>",
 		"price_logs":    "price_logs list<frozen<car_price_log>>",
-		"rewards":       "rewards map<int, frozen<car_reward>>",
+		"reward":        "reward car_reward",
 		"matrix":        "matrix list<frozen<list<int>>>",
 		"levels":        "levels list<int>",
 		"distributions": "distributions map<text, int>",
 		"matrix_map":    "matrix_map map<text, frozen<list<frozen<list<double>>>>>",
-		"machine":       "machine tuple<text, int, int, text>",
 	}
 
 	AssertEqual(t, len(carDAO.EntityInfo.Columns), len(assetCols))
@@ -63,7 +62,7 @@ func TestExample02(t *testing.T) {
 		AssertEqual(t, assetCols[column.Name], column.GetCqlTypeDeclareStatement())
 	}
 
-	//log.Println("Person", carDAO.EntityInfo.TableMetaData)
+	//log.Println("Car", carDAO.EntityInfo.TableMetaData)
 	AssertEqual(t, carDAO.EntityInfo.TableMetaData.Name, Car{}.TableName())
 	AssertEqual(t, len(carDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.TableMetaData.PartKey, []string{"id"}), true)
@@ -81,29 +80,8 @@ func TestExample02(t *testing.T) {
 					Type: gocql.NewNativeType(5, gocql.TypeDouble, ""),
 				},
 				{
-					Name: "price_book",
-					Type: gocql.NewNativeType(5, gocql.TypeUDT, ""),
-				},
-				{
 					Name: "created_at",
 					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
-				},
-			},
-		},
-		"price_book": gocql.UDTTypeInfo{
-			Name: "price_book",
-			Elements: []gocql.UDTField{
-				{
-					Name: "id",
-					Type: gocql.NewNativeType(5, gocql.TypeUUID, ""),
-				},
-				{
-					Name: "name",
-					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
-				},
-				{
-					Name: "year",
-					Type: gocql.NewNativeType(5, gocql.TypeInt, ""),
 				},
 			},
 		},

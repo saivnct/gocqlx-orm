@@ -8,7 +8,6 @@ import (
 	"github.com/gocql/gocql"
 	"log"
 	"testing"
-	"time"
 )
 
 func TestExample03(t *testing.T) {
@@ -47,11 +46,10 @@ func TestExample03(t *testing.T) {
 	}
 
 	assetCols := map[string]string{
-		"id":               "id timeuuid",
-		"name":             "name text",
-		"author":           "author text",
-		"content":          "content text",
-		"working_document": "working_document working_document",
+		"id":      "id timeuuid",
+		"name":    "name text",
+		"author":  "author text",
+		"content": "content text",
 	}
 
 	AssertEqual(t, len(bookDAO.EntityInfo.Columns), len(assetCols))
@@ -76,25 +74,27 @@ func TestExample03(t *testing.T) {
 	}
 	AssertEqual(t, count, 1)
 
-	book := Book{
-		Id:      gocql.TimeUUID(),
-		Name:    "My Book",
-		Author:  "Kira",
-		Content: "my deathnote",
-		WorkingDocument: WorkingDoc{
-			Name:      "Hello World",
-			CreatedAt: time.Now(),
-		},
+	for i := 1; i < 10; i++ {
+		book := Book{
+			Id:      gocql.TimeUUID(),
+			Name:    fmt.Sprintf("book_%d", i),
+			Author:  "Kira",
+			Content: fmt.Sprintf("my deathnote %d", i),
+		}
+		err = bookDAO.Save(session, book)
+		if err != nil {
+			t.Errorf(err.Error())
+			return
+		}
 	}
-	err = bookDAO.Save(session, book)
+
+	var books []Book
+	err = bookDAO.FindAll(session, &books)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
 
-	spew.Dump(WorkingDoc{
-		Name:      "Hello World",
-		CreatedAt: time.Now(),
-	})
+	spew.Dump(books)
 
 }

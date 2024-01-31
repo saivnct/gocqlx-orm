@@ -1,25 +1,18 @@
 package test
 
 import (
-	"github.com/scylladb/gocqlx/v2"
-	"log"
-	"reflect"
+	"github.com/davecgh/go-spew/spew"
 	"testing"
 )
 
 func TestParse(t *testing.T) {
-	f := FavoritePlace{}
-	v := reflect.ValueOf(f)
-	typ := v.Type()
-	log.Println(typ.Implements(reflect.TypeOf((*gocqlx.UDT)(nil)).Elem()))
-
-	var tVal reflect.Value = reflect.New(typ)
-	if baseUDT, ok := tVal.Elem().Interface().(gocqlx.UDT); ok {
-		log.Println("baseUDT", baseUDT)
+	f := FavoritePlace{
+		City:       "Bangkok",
+		Country:    "Thailand",
+		Population: 10000000,
 	}
+	spew.Dump(f)
 
-	//l := LandMark{}
-	//v = reflect.ValueOf(l)
-	//typ = v.Type()
-	//log.Println(typ.Implements(reflect.TypeOf((*gocqlx.UDT)(nil)).Elem()))
+	f.City = "Hanoi"
+	spew.Dump(f)
 }

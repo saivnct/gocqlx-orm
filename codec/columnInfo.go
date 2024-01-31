@@ -6,8 +6,9 @@ import (
 )
 
 type ColumnInfo struct {
-	Name string
-	Type gocql.TypeInfo
+	Name   string
+	Frozen bool
+	Type   gocql.TypeInfo
 }
 
 func (c ColumnInfo) String() string {
@@ -15,5 +16,8 @@ func (c ColumnInfo) String() string {
 }
 
 func (c ColumnInfo) GetCqlTypeDeclareStatement() string {
+	if c.Frozen {
+		return fmt.Sprintf("%s frozen<%s>", c.Name, GetCqlTypeDeclareStatement(c.Type, false))
+	}
 	return fmt.Sprintf("%s %s", c.Name, GetCqlTypeDeclareStatement(c.Type, false))
 }

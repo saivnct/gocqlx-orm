@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"giangbb.studio/go.cqlx.orm/entity"
 	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gocql/gocql"
 	"github.com/scylladb/go-reflectx"
 	"github.com/scylladb/gocqlx/v2/table"
@@ -70,16 +71,54 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		var cqlType gocql.TypeInfo
 		var err error
 
+		frozen := false
+
 		colType := strings.TrimSpace(field.Tag.Get("dbType"))
 		if len(colType) == 0 {
 			cqlType, err = convertToDefaultCqlType(field.Type)
 			if err != nil {
 				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> %w", ConvertToDefaultCQLTypeErr, tableName, field.Name, err)
 			}
+
+			if cqlUDT, ok := cqlType.(gocql.UDTTypeInfo); ok {
+				for _, element := range cqlUDT.Elements {
+					if element.Type.Type() == gocql.TypeCustom ||
+						element.Type.Type() == gocql.TypeUDT ||
+						element.Type.Type() == gocql.TypeTuple ||
+						element.Type.Type() == gocql.TypeList ||
+						element.Type.Type() == gocql.TypeSet ||
+						element.Type.Type() == gocql.TypeMap {
+						frozen = true
+						break
+					}
+				}
+			}
+
 		} else {
+			frozen = strings.HasPrefix(colType, "frozen<")
+
 			cqlType, err = getCqlType(colType)
 			if err != nil {
 				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> %w", ParseCQLTypeErr, tableName, field.Name, err)
+			}
+
+			if cqlType.Type() == gocql.TypeCustom {
+				reCheckCqlType, err := convertToDefaultCqlType(field.Type)
+				if err != nil {
+					return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> %w", ConvertToDefaultCQLTypeErr, tableName, field.Name, err)
+				}
+
+				if reCheckCqlType.Type() != gocql.TypeCustom {
+					if cqlUDT, ok := reCheckCqlType.(gocql.UDTTypeInfo); ok {
+						cqlUDT.Name = cqlType.Custom()
+						cqlType = cqlUDT
+					} else {
+						cqlType = reCheckCqlType
+					}
+				}
+
+				spew.Dump("custom cqlType:", cqlType)
+
 			}
 
 			if !validateFieldType(field.Type, cqlType) {
@@ -96,8 +135,9 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		}
 
 		columns = append(columns, ColumnInfo{
-			Name: colName,
-			Type: cqlType,
+			Name:   colName,
+			Frozen: frozen,
+			Type:   cqlType,
 		})
 
 		pk := strings.TrimSpace(field.Tag.Get("pk"))
