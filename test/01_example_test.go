@@ -31,7 +31,7 @@ func TestExample01(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		CleanUp(session, keyspace)
+		//CleanUp(session, keyspace)
 		session.Close()
 	}()
 
@@ -74,6 +74,7 @@ func TestExample01(t *testing.T) {
 	AssertEqual(t, len(personDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.PartKey, []string{"first_name", "last_name"}), true)
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
+	AssertEqual(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.Indexes, []string{"last_name", "first_name", "email"}), true)
 
 	log.Println("SortKey", personDAO.EntityInfo.TableMetaData.SortKey)
 	log.Println("Check UDT")
@@ -155,6 +156,18 @@ func TestExample01(t *testing.T) {
 	log.Printf("Person UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
 	log.Printf("Person: %s\n\n", personDAO.EntityInfo.GetGreateTableStatement())
 
+	for _, index := range personDAO.EntityInfo.Indexes {
+		var count int
+		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, personDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", personDAO.EntityInfo.TableMetaData.Name, index))
+		//log.Println(str)
+		err = session.Query(str, nil).Get(&count)
+		if err != nil {
+			t.Errorf(err.Error())
+			return
+		}
+		AssertEqual(t, count, 1)
+	}
+
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Person{}.TableName()), nil).Get(&count)
 	if err != nil {
@@ -201,4 +214,11 @@ func TestExample01(t *testing.T) {
 	}
 
 	log.Println("persons", persons)
+
+	////////////////////////////DELETE ALL////////////////////////////////////////////
+	err = personDAO.DeleteAll()
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
 }

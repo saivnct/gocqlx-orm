@@ -31,7 +31,7 @@ func TestExample03(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		CleanUp(session, keyspace)
+		//CleanUp(session, keyspace)
 		session.Close()
 	}()
 
@@ -66,9 +66,22 @@ func TestExample03(t *testing.T) {
 	AssertEqual(t, len(bookDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.PartKey, []string{"author", "name"}), true)
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
+	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.Indexes, []string{"name"}), true)
 
 	log.Printf("Book: %s\n\n", bookDAO.EntityInfo.TableMetaData)
 	log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetGreateTableStatement())
+
+	for _, index := range bookDAO.EntityInfo.Indexes {
+		var count int
+		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, bookDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", bookDAO.EntityInfo.TableMetaData.Name, index))
+		//log.Println(str)
+		err = session.Query(str, nil).Get(&count)
+		if err != nil {
+			t.Errorf(err.Error())
+			return
+		}
+		AssertEqual(t, count, 1)
+	}
 
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Book{}.TableName()), nil).Get(&count)
@@ -80,7 +93,7 @@ func TestExample03(t *testing.T) {
 
 	err = bookDAO.Save(Book{
 		Id:        gocql.TimeUUID(),
-		Name:      "book",
+		Name:      "book 2",
 		Author:    "Kira 2",
 		Content:   "my deathnote ",
 		CreatedAt: time.Now(),
@@ -109,7 +122,7 @@ func TestExample03(t *testing.T) {
 		return
 	}
 
-	////////////////////////////////////////////////////////////////////////
+	/////////////////////////////FIND ALL///////////////////////////////////////////
 	var dbBooks []Book
 	err = bookDAO.FindAll(&dbBooks)
 	if err != nil {
@@ -125,7 +138,7 @@ func TestExample03(t *testing.T) {
 	}
 	AssertEqual(t, int64(len(books)+1), countAll)
 
-	////////////////////////////////////////////////////////////////////////
+	/////////////////////////////FIND WITH PRIMARY KEY///////////////////////////////////////////
 	var dbBooks2 []Book
 	err = bookDAO.FindByPrimaryKey(Book{
 		Name:   "book",
@@ -149,7 +162,7 @@ func TestExample03(t *testing.T) {
 		AssertEqual(t, dbBooks2[0].CreatedAt, dbBooks[len(dbBooks)-1].CreatedAt)
 	}
 
-	////////////////////////////////////////////////////////////////////////
+	/////////////////////////////FIND WITH PARTITION KEY///////////////////////////////////////////
 	var dbBooks3 []Book
 	err = bookDAO.FindByPartitionKey(Book{
 		Author: "Kira",
@@ -170,7 +183,7 @@ func TestExample03(t *testing.T) {
 		AssertEqual(t, book.Name, "book")
 	}
 
-	////////////////////////////////////////////////////////////////////////
+	/////////////////////////////FIND ALL///////////////////////////////////////////
 	var dbBooks4 []Book
 	err = bookDAO.Find(Book{}, false, &dbBooks4)
 	if err != nil {
@@ -179,7 +192,7 @@ func TestExample03(t *testing.T) {
 	}
 	AssertEqual(t, len(books)+1, len(dbBooks4))
 
-	////////////////////////////////////////////////////////////////////////
+	////////////////////////////FIND WITH ALLOW FILTERING////////////////////////////////////////////
 	var dbBooks5 []Book
 	err = bookDAO.Find(Book{
 		Author: "Kira",
@@ -195,7 +208,7 @@ func TestExample03(t *testing.T) {
 	}
 	AssertEqual(t, len(books), len(dbBooks5))
 
-	////////////////////////////////////////////////////////////////////////
+	////////////////////////////COUNT WITH ALLOW FILTERING////////////////////////////////////////////
 	countQuery, err := bookDAO.Count(Book{
 		Author: "Kira 2",
 	}, false)
@@ -210,7 +223,29 @@ func TestExample03(t *testing.T) {
 	}
 	AssertEqual(t, int64(1), countQuery)
 
-	////////////////////////////////////////////////////////////////////////
+	////////////////////////////FIND WITH INDEX////////////////////////////////////////////
+	var dbBooks6 []Book
+	err = bookDAO.Find(Book{
+		Name: "book",
+	}, false, &dbBooks6)
+
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(books), len(dbBooks6))
+
+	////////////////////////////COUNT WITH INDEX////////////////////////////////////////////
+	countQuery, err = bookDAO.Count(Book{
+		Name: "book 2",
+	}, false)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, int64(1), countQuery)
+
+	////////////////////////////DELETE BY PRIMARY KEY////////////////////////////////////////////
 	err = bookDAO.DeleteByPrimaryKey(Book{
 		Name:      "book",
 		Author:    "Kira",
@@ -221,19 +256,19 @@ func TestExample03(t *testing.T) {
 		return
 	}
 
-	var dbBooks6 []Book
+	var dbBooks7 []Book
 	err = bookDAO.FindByPrimaryKey(Book{
 		Name:      "book",
 		Author:    "Kira",
 		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
-	}, &dbBooks6)
+	}, &dbBooks7)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(dbBooks6), 0)
+	AssertEqual(t, len(dbBooks7), 0)
 
-	////////////////////////////////////////////////////////////////////////
+	////////////////////////////DELETE BY PARTITION KEY////////////////////////////////////////////
 	err = bookDAO.DeleteByPartitionKey(Book{
 		Name:   "book",
 		Author: "Kira",
@@ -243,18 +278,18 @@ func TestExample03(t *testing.T) {
 		return
 	}
 
-	var dbBooks7 []Book
+	var dbBooks8 []Book
 	err = bookDAO.FindByPartitionKey(Book{
 		Name:   "book",
 		Author: "Kira",
-	}, &dbBooks7)
+	}, &dbBooks8)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(dbBooks7), 0)
+	AssertEqual(t, len(dbBooks8), 0)
 
-	////////////////////////////////////////////////////////////////////////
+	////////////////////////////DELETE ALL////////////////////////////////////////////
 	err = bookDAO.SaveMany(books)
 	if err != nil {
 		t.Errorf(err.Error())

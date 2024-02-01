@@ -7,8 +7,8 @@ import (
 
 type Book struct {
 	Id        gocql.UUID `dbType:"timeuuid"`
-	Name      string     `pk:"2"` // not declare db:"name" -> default db:"name"
-	Author    string     `pk:"1"` // not declare db:"author" -> default db:"author"
+	Name      string     `pk:"2" index:"true"` // not declare db:"name" -> default db:"name"
+	Author    string     `pk:"1"`              // not declare db:"author" -> default db:"author"
 	Content   string
 	CreatedAt time.Time `ck:"1"`
 }

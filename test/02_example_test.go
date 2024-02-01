@@ -137,7 +137,7 @@ func TestExample02(t *testing.T) {
 	for _, index := range carDAO.EntityInfo.Indexes {
 		var count int
 		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, carDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", carDAO.EntityInfo.TableMetaData.Name, index))
-		log.Println(str)
+		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		if err != nil {
 			t.Errorf(err.Error())
@@ -198,5 +198,12 @@ func TestExample02(t *testing.T) {
 	}
 
 	log.Println("cars", cars)
+
+	////////////////////////////DELETE ALL////////////////////////////////////////////
+	err = carDAO.DeleteAll()
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
 
 }

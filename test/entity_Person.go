@@ -7,10 +7,10 @@ import (
 
 type Person struct {
 	Id             gocql.UUID    `db:"id" dbType:"timeuuid"`
-	LastName       string        `db:"last_name" pk:"2"`
-	FirstName      string        `pk:"1"` // not declare db:"first_name" -> default db:"first_name"
+	LastName       string        `db:"last_name" pk:"2" index:"true"`
+	FirstName      string        `pk:"1" index:"true"` // not declare db:"first_name" -> default db:"first_name"
 	FavoritePlace  FavoritePlace `db:"favorite_place"`
-	Email          string        //not declare db:"email" -> default db:"email"
+	Email          string        `index:"true"` //not declare db:"email" -> default db:"email"
 	StaticIP       string        `db:"static_ip" dbType:"inet"`
 	Nicknames      []string      `db:"nick_names" dbType:"set<text>"`
 	WorkingHistory map[int]string

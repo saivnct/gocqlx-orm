@@ -2,7 +2,7 @@ package test
 
 import (
 	"fmt"
-	cqlxo_connection "giangbb.studio/go.cqlx.orm/connection"
+	"giangbb.studio/go.cqlx.orm/connection"
 	"github.com/scylladb/gocqlx/v2"
 	"os"
 	"testing"
