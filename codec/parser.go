@@ -45,8 +45,8 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 
 	t := v.Type()
 
-	//var columns []string
 	var columns []ColumnInfo
+	var indexes []string
 	var columFieldMap = map[string]string{}
 	var fieldColumdMap = map[string]string{}
 
@@ -144,6 +144,11 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		columFieldMap[colName] = field.Name
 		fieldColumdMap[field.Name] = colName
 
+		index := strings.TrimSpace(field.Tag.Get("index"))
+		if index == "true" {
+			indexes = append(indexes, colName)
+		}
+
 		//log.Printf("colName: %s, field.Name: %s\n", colName, field.Name)
 
 		pk := strings.TrimSpace(field.Tag.Get("pk"))
@@ -214,6 +219,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		TableMetaData:  tableMetaData,
 		Table:          table.New(tableMetaData),
 		Columns:        columns,
+		Indexes:        indexes,
 		ColumFieldMap:  columFieldMap,
 		FieldColumdMap: fieldColumdMap,
 	}

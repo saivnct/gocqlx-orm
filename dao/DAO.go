@@ -42,6 +42,11 @@ func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseModelInterface) 
 		return err
 	}
 
+	err = d.checkAndCreateIndex()
+	if err != nil {
+		return err
+	}
+
 	//log.Printf("DAO %s created!", m.TableName())
 	return nil
 }
@@ -71,6 +76,21 @@ func (d *DAO) checkAndCreateTable() error {
 	//log.Println(d.EntityInfo.GetGreateTableStatement())
 	err := d.Session.ExecStmt(d.EntityInfo.GetGreateTableStatement())
 	return err
+}
+
+func (d *DAO) checkAndCreateIndex() error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	for _, index := range d.EntityInfo.Indexes {
+		err := d.Session.ExecStmt(fmt.Sprintf("CREATE INDEX IF NOT EXISTS ON %s(%s)", d.EntityInfo.TableMetaData.Name, index))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (d *DAO) Save(entity cqlxoEntity.BaseModelInterface) error {

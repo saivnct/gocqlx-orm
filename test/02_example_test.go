@@ -31,7 +31,7 @@ func TestExample02(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		CleanUp(session, keyspace)
+		//CleanUp(session, keyspace)
 		session.Close()
 	}()
 
@@ -68,9 +68,10 @@ func TestExample02(t *testing.T) {
 	AssertEqual(t, len(carDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.TableMetaData.PartKey, []string{"id"}), true)
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.TableMetaData.SortKey, []string{"year"}), true)
+	AssertEqual(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.Indexes, []string{"brand", "model"}), true)
 
-	log.Println("SortKey", carDAO.EntityInfo.TableMetaData.SortKey)
-	log.Println("Check UDT")
+	//log.Println("Indexes", carDAO.EntityInfo.Indexes)
+	//log.Println("Check UDT")
 
 	assetUDTs := map[string]gocql.UDTTypeInfo{
 		"car_price_log": gocql.UDTTypeInfo{
@@ -132,6 +133,18 @@ func TestExample02(t *testing.T) {
 	udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
 	log.Printf("Car UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
 	log.Printf("Car: %s\n\n", carDAO.EntityInfo.GetGreateTableStatement())
+
+	for _, index := range carDAO.EntityInfo.Indexes {
+		var count int
+		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, carDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", carDAO.EntityInfo.TableMetaData.Name, index))
+		log.Println(str)
+		err = session.Query(str, nil).Get(&count)
+		if err != nil {
+			t.Errorf(err.Error())
+			return
+		}
+		AssertEqual(t, count, 1)
+	}
 
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Car{}.TableName()), nil).Get(&count)

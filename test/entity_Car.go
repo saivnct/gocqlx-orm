@@ -6,8 +6,8 @@ import (
 
 type Car struct {
 	Id                  gocql.UUID             `db:"id" pk:"1"`
-	Brand               string                 `db:"brand"`
-	Model               string                 `db:"model"`
+	Brand               string                 `db:"brand" index:"true"`
+	Model               string                 `db:"model" index:"true"`
 	Year                int                    `db:"year" ck:"1"`
 	Colors              []string               `db:"colors"`
 	PriceLog            CarPriceLog            `db:"price_log"`

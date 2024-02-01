@@ -12,6 +12,7 @@ type EntityInfo struct {
 	TableMetaData  table.Metadata
 	Table          *table.Table
 	Columns        []ColumnInfo
+	Indexes        []string
 	ColumFieldMap  map[string]string //column name => field name
 	FieldColumdMap map[string]string //field name => column name
 }
