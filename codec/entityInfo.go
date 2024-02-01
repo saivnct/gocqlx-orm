@@ -9,9 +9,11 @@ import (
 )
 
 type EntityInfo struct {
-	TableMetaData table.Metadata
-	Table         *table.Table
-	Columns       []ColumnInfo
+	TableMetaData  table.Metadata
+	Table          *table.Table
+	Columns        []ColumnInfo
+	ColumFieldMap  map[string]string //column name => field name
+	FieldColumdMap map[string]string //field name => column name
 }
 
 func (e EntityInfo) GetPrimaryKey() string {

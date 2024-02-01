@@ -1,13 +1,16 @@
 package test
 
 import (
+	"errors"
 	"fmt"
 	"giangbb.studio/go.cqlx.orm/connection"
+	cqlxoDAO "giangbb.studio/go.cqlx.orm/dao"
+	cqlxoEntity "giangbb.studio/go.cqlx.orm/entity"
 	"giangbb.studio/go.cqlx.orm/utils/stringUtils"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gocql/gocql"
 	"log"
 	"testing"
+	"time"
 )
 
 func TestExample03(t *testing.T) {
@@ -46,10 +49,11 @@ func TestExample03(t *testing.T) {
 	}
 
 	assetCols := map[string]string{
-		"id":      "id timeuuid",
-		"name":    "name text",
-		"author":  "author text",
-		"content": "content text",
+		"id":         "id timeuuid",
+		"name":       "name text",
+		"author":     "author text",
+		"content":    "content text",
+		"created_at": "created_at timestamp",
 	}
 
 	AssertEqual(t, len(bookDAO.EntityInfo.Columns), len(assetCols))
@@ -61,7 +65,7 @@ func TestExample03(t *testing.T) {
 	AssertEqual(t, bookDAO.EntityInfo.TableMetaData.Name, Book{}.TableName())
 	AssertEqual(t, len(bookDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.PartKey, []string{"author", "name"}), true)
-	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.SortKey, []string{}), true)
+	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
 
 	log.Printf("Book: %s\n\n", bookDAO.EntityInfo.TableMetaData)
 	log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetGreateTableStatement())
@@ -74,27 +78,199 @@ func TestExample03(t *testing.T) {
 	}
 	AssertEqual(t, count, 1)
 
-	for i := 1; i < 10; i++ {
-		book := Book{
-			Id:      gocql.TimeUUID(),
-			Name:    fmt.Sprintf("book_%d", i),
-			Author:  "Kira",
-			Content: fmt.Sprintf("my deathnote %d", i),
-		}
-		err = bookDAO.Save(session, book)
-		if err != nil {
-			t.Errorf(err.Error())
-			return
-		}
-	}
-
-	var books []Book
-	err = bookDAO.FindAll(session, &books)
+	err = bookDAO.Save(Book{
+		Id:        gocql.TimeUUID(),
+		Name:      "book",
+		Author:    "Kira 2",
+		Content:   "my deathnote ",
+		CreatedAt: time.Now(),
+	})
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
 
-	spew.Dump(books)
+	var books []cqlxoEntity.BaseModelInterface
+	for i := 1; i < 10; i++ {
+		book := Book{
+			Id:        gocql.TimeUUID(),
+			Name:      "book",
+			Author:    "Kira",
+			Content:   fmt.Sprintf("my deathnote %d", i),
+			CreatedAt: time.Now(),
+		}
+		books = append(books, book)
+		time.Sleep(10 * time.Millisecond)
+	}
 
+	err = bookDAO.SaveMany(books)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	////////////////////////////////////////////////////////////////////////
+	var dbBooks []Book
+	err = bookDAO.FindAll(&dbBooks)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(books)+1, len(dbBooks))
+
+	countAll, err := bookDAO.CountAll()
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, int64(len(books)+1), countAll)
+
+	////////////////////////////////////////////////////////////////////////
+	var dbBooks2 []Book
+	err = bookDAO.FindByPrimaryKey(Book{
+		Name:   "book",
+		Author: "Kira",
+	}, &dbBooks2)
+	AssertEqual(t, errors.Is(err, cqlxoDAO.InvalidPrimaryKey), true)
+
+	err = bookDAO.FindByPrimaryKey(Book{
+		Name:      "book",
+		Author:    "Kira",
+		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
+	}, &dbBooks2)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(dbBooks2), 1)
+	if len(dbBooks2) > 0 {
+		AssertEqual(t, dbBooks2[0].Author, "Kira")
+		AssertEqual(t, dbBooks2[0].Name, "book")
+		AssertEqual(t, dbBooks2[0].CreatedAt, dbBooks[len(dbBooks)-1].CreatedAt)
+	}
+
+	////////////////////////////////////////////////////////////////////////
+	var dbBooks3 []Book
+	err = bookDAO.FindByPartitionKey(Book{
+		Author: "Kira",
+	}, &dbBooks3)
+	AssertEqual(t, errors.Is(err, cqlxoDAO.InvalidPartitionKey), true)
+
+	err = bookDAO.FindByPartitionKey(Book{
+		Name:   "book",
+		Author: "Kira",
+	}, &dbBooks3)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(books), len(dbBooks3))
+	for _, book := range dbBooks3 {
+		AssertEqual(t, book.Author, "Kira")
+		AssertEqual(t, book.Name, "book")
+	}
+
+	////////////////////////////////////////////////////////////////////////
+	var dbBooks4 []Book
+	err = bookDAO.Find(Book{}, false, &dbBooks4)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(books)+1, len(dbBooks4))
+
+	////////////////////////////////////////////////////////////////////////
+	var dbBooks5 []Book
+	err = bookDAO.Find(Book{
+		Author: "Kira",
+	}, false, &dbBooks5)
+	AssertEqual(t, err != nil, true)
+
+	err = bookDAO.Find(Book{
+		Author: "Kira",
+	}, true, &dbBooks5)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(books), len(dbBooks5))
+
+	////////////////////////////////////////////////////////////////////////
+	countQuery, err := bookDAO.Count(Book{
+		Author: "Kira 2",
+	}, false)
+	AssertEqual(t, err != nil, true)
+
+	countQuery, err = bookDAO.Count(Book{
+		Author: "Kira 2",
+	}, true)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, int64(1), countQuery)
+
+	////////////////////////////////////////////////////////////////////////
+	err = bookDAO.DeleteByPrimaryKey(Book{
+		Name:      "book",
+		Author:    "Kira",
+		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
+	})
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	var dbBooks6 []Book
+	err = bookDAO.FindByPrimaryKey(Book{
+		Name:      "book",
+		Author:    "Kira",
+		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
+	}, &dbBooks6)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(dbBooks6), 0)
+
+	////////////////////////////////////////////////////////////////////////
+	err = bookDAO.DeleteByPartitionKey(Book{
+		Name:   "book",
+		Author: "Kira",
+	})
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	var dbBooks7 []Book
+	err = bookDAO.FindByPartitionKey(Book{
+		Name:   "book",
+		Author: "Kira",
+	}, &dbBooks7)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(dbBooks7), 0)
+
+	////////////////////////////////////////////////////////////////////////
+	err = bookDAO.SaveMany(books)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	err = bookDAO.DeleteAll()
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	countAll, err = bookDAO.CountAll()
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, int64(0), countAll)
 }

@@ -1,15 +1,26 @@
 package cqlxoDAO
 
 import (
+	"errors"
+	"fmt"
 	"giangbb.studio/go.cqlx.orm/codec"
 	"giangbb.studio/go.cqlx.orm/entity"
 	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"github.com/scylladb/gocqlx/v2"
 	"github.com/scylladb/gocqlx/v2/qb"
+	"reflect"
+)
+
+var (
+	NoSessionError      = errors.New("no Session Connection Found")
+	NoQueryEntityError  = errors.New("no Query Entity")
+	InvalidPrimaryKey   = errors.New("invalid PrimaryKey")
+	InvalidPartitionKey = errors.New("invalid PartitionKey")
 )
 
 type DAO struct {
 	EntityInfo cqlxoCodec.EntityInfo
+	Session    gocqlx.Session
 }
 
 func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseModelInterface) error {
@@ -19,13 +30,14 @@ func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseModelInterface) 
 	}
 
 	d.EntityInfo = entityInfo
+	d.Session = session
 
-	err = d.CheckAndCreateUDT(session)
+	err = d.checkAndCreateUDT()
 	if err != nil {
 		return err
 	}
 
-	err = d.CheckAndCreateTable(session)
+	err = d.checkAndCreateTable()
 	if err != nil {
 		return err
 	}
@@ -34,13 +46,16 @@ func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseModelInterface) 
 	return nil
 }
 
-func (d *DAO) CheckAndCreateUDT(session gocqlx.Session) error {
+func (d *DAO) checkAndCreateUDT() error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
 	udts := d.EntityInfo.ScanUDTs()
 	udts = sliceUtils.Reverse(udts)
 
 	for _, udt := range udts {
 		//log.Println(cqlxoCodec.GetCqlCreateUDTStatement(udt))
-		err := session.ExecStmt(cqlxoCodec.GetCqlCreateUDTStatement(udt))
+		err := d.Session.ExecStmt(cqlxoCodec.GetCqlCreateUDTStatement(udt))
 		if err != nil {
 			return err
 		}
@@ -48,20 +63,272 @@ func (d *DAO) CheckAndCreateUDT(session gocqlx.Session) error {
 	return nil
 }
 
-func (d *DAO) CheckAndCreateTable(session gocqlx.Session) error {
+func (d *DAO) checkAndCreateTable() error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
 	//log.Println(d.EntityInfo.GetGreateTableStatement())
-	err := session.ExecStmt(d.EntityInfo.GetGreateTableStatement())
+	err := d.Session.ExecStmt(d.EntityInfo.GetGreateTableStatement())
 	return err
 }
 
-func (d *DAO) Save(session gocqlx.Session, entity cqlxoEntity.BaseModelInterface) error {
-	q := session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
+func (d *DAO) Save(entity cqlxoEntity.BaseModelInterface) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+	q := d.Session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
 	//log.Printf("Save %s", q.String())
 	return q.ExecRelease()
 }
 
-func (d *DAO) FindAll(session gocqlx.Session, result interface{}) error {
-	q := qb.Select(d.EntityInfo.TableMetaData.Name).Columns(d.EntityInfo.TableMetaData.Columns...).Query(session)
-	err := q.Select(result)
+func (d *DAO) SaveMany(entities []cqlxoEntity.BaseModelInterface) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	q := d.EntityInfo.Table.InsertQuery(d.Session)
+	for _, entity := range entities {
+		q.BindStruct(entity)
+		if err := q.Exec(); err != nil {
+			return err
+		}
+	}
+	q.Release()
+	return nil
+}
+
+func (d *DAO) FindAll(result interface{}) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	q := qb.Select(d.EntityInfo.TableMetaData.Name).Columns(d.EntityInfo.TableMetaData.Columns...).Query(d.Session)
+	err := q.SelectRelease(result)
 	return err
+}
+
+func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface, result interface{}) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	if queryEntity == nil {
+		return NoQueryEntityError
+	}
+
+	keys := append(d.EntityInfo.TableMetaData.PartKey, d.EntityInfo.TableMetaData.SortKey...)
+	queryMap := d.getQueryMap(queryEntity, keys)
+
+	if len(queryMap) != len(keys) {
+		return InvalidPrimaryKey
+	}
+
+	var cmps = getCmp(queryMap)
+	q := qb.
+		Select(d.EntityInfo.TableMetaData.Name).
+		Columns(d.EntityInfo.TableMetaData.Columns...).
+		Where(cmps...).
+		Query(d.Session).
+		BindMap(queryMap)
+
+	return q.SelectRelease(result)
+}
+
+func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface, result interface{}) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	if queryEntity == nil {
+		return NoQueryEntityError
+	}
+
+	keys := d.EntityInfo.TableMetaData.PartKey
+	queryMap := d.getQueryMap(queryEntity, keys)
+
+	if len(queryMap) != len(keys) {
+		return InvalidPartitionKey
+	}
+
+	var cmps = getCmp(queryMap)
+	q := qb.
+		Select(d.EntityInfo.TableMetaData.Name).
+		Columns(d.EntityInfo.TableMetaData.Columns...).
+		Where(cmps...).
+		Query(d.Session).
+		BindMap(queryMap)
+
+	return q.SelectRelease(result)
+}
+
+func (d *DAO) Find(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bool, result interface{}) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	if queryEntity == nil {
+		return d.FindAll(result)
+	}
+
+	columns := d.EntityInfo.TableMetaData.Columns
+	queryMap := d.getQueryMap(queryEntity, columns)
+
+	if len(queryMap) == 0 {
+		return d.FindAll(result)
+	}
+
+	//log.Print(queryMap)
+
+	var cmps = getCmp(queryMap)
+
+	sBuilder := qb.
+		Select(d.EntityInfo.TableMetaData.Name).
+		Columns(d.EntityInfo.TableMetaData.Columns...).
+		Where(cmps...)
+
+	if allowFiltering {
+		sBuilder.AllowFiltering()
+	}
+
+	q := sBuilder.Query(d.Session).BindMap(queryMap)
+
+	return q.SelectRelease(result)
+}
+
+func (d *DAO) CountAll() (int64, error) {
+	if d.Session.Session == nil {
+		return 0, NoSessionError
+	}
+
+	var count []int64
+
+	q := qb.Select(d.EntityInfo.TableMetaData.Name).CountAll().Query(d.Session)
+	err := q.SelectRelease(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count[0], err
+}
+
+func (d *DAO) Count(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bool) (int64, error) {
+	if d.Session.Session == nil {
+		return 0, NoSessionError
+	}
+
+	if queryEntity == nil {
+		return d.CountAll()
+	}
+
+	columns := d.EntityInfo.TableMetaData.Columns
+	queryMap := d.getQueryMap(queryEntity, columns)
+
+	if len(queryMap) == 0 {
+		return d.CountAll()
+	}
+
+	var cmps = getCmp(queryMap)
+
+	sBuilder := qb.
+		Select(d.EntityInfo.TableMetaData.Name).
+		Where(cmps...).CountAll()
+
+	if allowFiltering {
+		sBuilder.AllowFiltering()
+	}
+
+	var count []int64
+
+	q := sBuilder.Query(d.Session).BindMap(queryMap)
+	err := q.SelectRelease(&count)
+	if err != nil || len(count) == 0 {
+		return 0, err
+	}
+
+	return count[0], err
+}
+
+func (d *DAO) DeleteAll() error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	return d.Session.ExecStmt(fmt.Sprintf("TRUNCATE %s", d.EntityInfo.TableMetaData.Name))
+}
+
+func (d *DAO) DeleteByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	if queryEntity == nil {
+		return NoQueryEntityError
+	}
+
+	keys := append(d.EntityInfo.TableMetaData.PartKey, d.EntityInfo.TableMetaData.SortKey...)
+	queryMap := d.getQueryMap(queryEntity, keys)
+
+	if len(queryMap) != len(keys) {
+		return InvalidPrimaryKey
+	}
+
+	var cmps = getCmp(queryMap)
+
+	q := qb.
+		Delete(d.EntityInfo.TableMetaData.Name).
+		Where(cmps...).
+		Query(d.Session).
+		BindMap(queryMap)
+
+	return q.ExecRelease()
+}
+
+func (d *DAO) DeleteByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	if queryEntity == nil {
+		return NoQueryEntityError
+	}
+
+	keys := d.EntityInfo.TableMetaData.PartKey
+	queryMap := d.getQueryMap(queryEntity, keys)
+
+	if len(queryMap) != len(keys) {
+		return InvalidPartitionKey
+	}
+
+	var cmps = getCmp(queryMap)
+
+	q := qb.
+		Delete(d.EntityInfo.TableMetaData.Name).
+		Where(cmps...).
+		Query(d.Session).
+		BindMap(queryMap)
+
+	return q.ExecRelease()
+}
+
+func (d *DAO) getQueryMap(queryEntity cqlxoEntity.BaseModelInterface, columnNames []string) qb.M {
+	v := reflect.ValueOf(queryEntity)
+	queryMap := qb.M{}
+	for _, columnName := range columnNames {
+		fieldName := d.EntityInfo.ColumFieldMap[columnName]
+		fieldValue := v.FieldByName(fieldName)
+		fieldType := fieldValue.Type()
+		if fieldValue.IsValid() && !reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(fieldType).Interface()) {
+			queryMap[columnName] = fieldValue.Interface()
+		}
+	}
+	return queryMap
+}
+
+func getCmp(m qb.M) []qb.Cmp {
+	var cmps []qb.Cmp
+	for k, _ := range m {
+		cmps = append(cmps, qb.Eq(k))
+	}
+	return cmps
 }

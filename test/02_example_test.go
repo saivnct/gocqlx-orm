@@ -10,6 +10,7 @@ import (
 	"log"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExample02(t *testing.T) {
@@ -46,7 +47,7 @@ func TestExample02(t *testing.T) {
 		"model":         "model text",
 		"year":          "year int",
 		"colors":        "colors list<text>",
-		"price_logs":    "price_logs list<frozen<car_price_log>>",
+		"price_log":     "price_log car_price_log",
 		"reward":        "reward car_reward",
 		"matrix":        "matrix list<frozen<list<int>>>",
 		"levels":        "levels list<int>",
@@ -139,4 +140,50 @@ func TestExample02(t *testing.T) {
 		return
 	}
 	AssertEqual(t, count, 1)
+
+	car := Car{
+		Id:     gocql.TimeUUID(),
+		Brand:  "Toy",
+		Model:  "Prado",
+		Year:   2024,
+		Colors: []string{"red", "blue", "green"},
+		PriceLog: CarPriceLog{
+			Price:     100000,
+			CreatedAt: time.Now(),
+		},
+		Reward: CarReward{
+			Name:   "Best",
+			Cert:   "Good",
+			Reward: 120000,
+		},
+		Matrix: [][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}},
+		Levels: []int{1, 2, 3},
+		Distributions: map[string]int{
+			"VN": 100,
+			"US": 200,
+			"UK": 300,
+		},
+		MatrixMap: map[string][][]float64{
+			"VN": {{1.1, 1.2, 1.3}, {1.4, 1.5, 1.6}, {1.7, 1.8, 1.9}},
+			"US": {{2.1, 2.2, 2.3}, {2.4, 2.5, 2.6}, {2.7, 2.8, 2.9}},
+			"UK": {{3.1, 3.2, 3.3}, {3.4, 3.5, 3.6}, {3.7, 3.8, 3.9}},
+		},
+		ThisIgnoreField:     "BBBBB",
+		thisUnexportedField: "CCCCC",
+	}
+	err = carDAO.Save(car)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	var cars []Car
+	err = carDAO.FindAll(&cars)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+
+	log.Println("cars", cars)
+
 }

@@ -187,14 +187,14 @@ func TestExample01(t *testing.T) {
 		CreatedAt: time.Now(),
 	}
 
-	err = personDAO.Save(session, person)
+	err = personDAO.Save(person)
 	if err != nil {
 		t.Errorf("Unable to save person -> %v", err)
 		return
 	}
 
 	var persons []Person
-	err = personDAO.FindAll(session, &persons)
+	err = personDAO.FindAll(&persons)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
