@@ -2,11 +2,11 @@ package test
 
 import (
 	"fmt"
-	"giangbb.studio/go.cqlx.orm/connection"
-	cqlxoDAO "giangbb.studio/go.cqlx.orm/dao"
-	"giangbb.studio/go.cqlx.orm/entity"
-	"giangbb.studio/go.cqlx.orm/utils/stringUtils"
 	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/connection"
+	"github.com/saivnct/gocqlx-orm/dao"
+	"github.com/saivnct/gocqlx-orm/entity"
+	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
 	"log"
 	"testing"
 	"time"

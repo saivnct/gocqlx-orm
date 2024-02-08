@@ -1,7 +1,7 @@
 package test
 
 import (
-	"giangbb.studio/go.cqlx.orm/dao"
+	"github.com/saivnct/gocqlx-orm/dao"
 	"github.com/scylladb/gocqlx/v2"
 )
 

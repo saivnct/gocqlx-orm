@@ -3,10 +3,10 @@ package cqlxoCodec
 import (
 	"errors"
 	"fmt"
-	"giangbb.studio/go.cqlx.orm/entity"
-	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/entity"
+	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
 	"github.com/scylladb/go-reflectx"
 	"github.com/scylladb/gocqlx/v2/table"
 	"reflect"

@@ -2,8 +2,8 @@ package cqlxoCodec
 
 import (
 	"fmt"
-	"giangbb.studio/go.cqlx.orm/entity"
 	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/scylladb/go-reflectx"
 	"github.com/scylladb/gocqlx/v2"
 	"gopkg.in/inf.v0"

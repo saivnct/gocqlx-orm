@@ -2,11 +2,11 @@ package test
 
 import (
 	"fmt"
-	cqlxoCodec "giangbb.studio/go.cqlx.orm/codec"
-	"giangbb.studio/go.cqlx.orm/connection"
-	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
-	"giangbb.studio/go.cqlx.orm/utils/stringUtils"
 	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/codec"
+	"github.com/saivnct/gocqlx-orm/connection"
+	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
+	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
 	"log"
 	"strings"
 	"testing"

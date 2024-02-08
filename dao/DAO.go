@@ -3,9 +3,9 @@ package cqlxoDAO
 import (
 	"errors"
 	"fmt"
-	"giangbb.studio/go.cqlx.orm/codec"
-	"giangbb.studio/go.cqlx.orm/entity"
-	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
+	"github.com/saivnct/gocqlx-orm/codec"
+	"github.com/saivnct/gocqlx-orm/entity"
+	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
 	"github.com/scylladb/gocqlx/v2"
 	"github.com/scylladb/gocqlx/v2/qb"
 	"reflect"

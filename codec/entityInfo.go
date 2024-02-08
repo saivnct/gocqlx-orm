@@ -2,8 +2,8 @@ package cqlxoCodec
 
 import (
 	"fmt"
-	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
 	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
 	"github.com/scylladb/gocqlx/v2/table"
 	"strings"
 )

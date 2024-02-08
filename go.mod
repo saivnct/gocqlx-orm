@@ -1,4 +1,4 @@
-module giangbb.studio/go.cqlx.orm
+module github.com/saivnct/gocqlx-orm
 
 go 1.21.1
 
