@@ -30,7 +30,7 @@ func TestExample02(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		//CleanUp(session, keyspace)
+		CleanUp(session, keyspace)
 		session.Close()
 	}()
 
@@ -276,10 +276,10 @@ func TestExample02(t *testing.T) {
 
 			cars = append(cars, mCars...)
 
-			t.Logf("Page: %d -  items: %d", i, len(mCars))
-			for _, car := range mCars {
-				log.Println(car.Model)
-			}
+			//t.Logf("Page: %d -  items: %d", i, len(mCars))
+			//for _, car := range mCars {
+			//	log.Println(car.Model)
+			//}
 
 			page = nextPage
 			if len(nextPage) == 0 {

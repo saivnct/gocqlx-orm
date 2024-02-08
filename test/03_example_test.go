@@ -8,6 +8,7 @@ import (
 	cqlxoEntity "giangbb.studio/go.cqlx.orm/entity"
 	"giangbb.studio/go.cqlx.orm/utils/stringUtils"
 	"github.com/gocql/gocql"
+	"github.com/scylladb/gocqlx/v2/qb"
 	"log"
 	"testing"
 	"time"
@@ -31,7 +32,7 @@ func TestExample03(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		//CleanUp(session, keyspace)
+		CleanUp(session, keyspace)
 		session.Close()
 	}()
 
@@ -278,6 +279,53 @@ func TestExample03(t *testing.T) {
 		return
 	}
 	AssertEqual(t, int64(1), countQuery)
+
+	////////////////////////////FIND WITH OK WITH PAGINATION AND SORTING WITH CK ////////////////////////////////////////////
+	findWithPagination := func(bookDAO *BookDAO, b Book, itemsPerPage int, orderBy string, order qb.Order) ([]Book, error) {
+		log.Print("Find with pagination", b)
+		var (
+			books []Book
+			page  []byte
+		)
+		for i := 0; ; i++ {
+			var mBooks []Book
+
+			nextPage, err := bookDAO.FindWithOption(b, cqlxoDAO.QueryOption{
+				Page:         page,
+				ItemsPerPage: itemsPerPage,
+				OrderBy:      orderBy,
+				Order:        order,
+			}, &mBooks)
+
+			if err != nil {
+				return nil, err
+			}
+
+			books = append(books, mBooks...)
+
+			//t.Logf("Page: %d -  items: %d", i, len(mBooks))
+			//for _, book := range mBooks {
+			//	log.Println(book.CreatedAt)
+			//}
+
+			page = nextPage
+			if len(nextPage) == 0 {
+				break
+			}
+		}
+
+		return books, nil
+	}
+
+	books, err = findWithPagination(bookDAO, Book{
+		Name:   "book",
+		Author: "Kira",
+	}, 5, "created_at", qb.DESC)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(books), len(bookEntities))
 
 	////////////////////////////DELETE BY PRIMARY KEY////////////////////////////////////////////
 	err = bookDAO.DeleteByPrimaryKey(Book{

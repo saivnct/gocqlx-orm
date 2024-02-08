@@ -31,7 +31,7 @@ func TestExample01(t *testing.T) {
 	}
 	session := *sessionP
 	defer func() {
-		//CleanUp(session, keyspace)
+		CleanUp(session, keyspace)
 		session.Close()
 	}()
 
