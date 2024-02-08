@@ -2,13 +2,12 @@ package test
 
 import (
 	"fmt"
-	cqlxoCodec "giangbb.studio/go.cqlx.orm/codec"
 	"giangbb.studio/go.cqlx.orm/connection"
-	"giangbb.studio/go.cqlx.orm/utils/sliceUtils"
+	cqlxoDAO "giangbb.studio/go.cqlx.orm/dao"
+	"giangbb.studio/go.cqlx.orm/entity"
 	"giangbb.studio/go.cqlx.orm/utils/stringUtils"
 	"github.com/gocql/gocql"
 	"log"
-	"strings"
 	"testing"
 	"time"
 )
@@ -46,6 +45,7 @@ func TestExample02(t *testing.T) {
 		"brand":         "brand text",
 		"model":         "model text",
 		"year":          "year int",
+		"name":          "name text",
 		"colors":        "colors list<text>",
 		"price_log":     "price_log car_price_log",
 		"reward":        "reward car_reward",
@@ -127,12 +127,12 @@ func TestExample02(t *testing.T) {
 		}
 		AssertEqual(t, count, 1)
 	}
-	udtNames := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return udt.Name })
-	log.Printf("Car UDTs: %s\n\n", strings.Join(udtNames, ", "))
+	//udtNames := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return udt.Name })
+	//log.Printf("Car UDTs: %s\n\n", strings.Join(udtNames, ", "))
 
-	udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
-	log.Printf("Car UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
-	log.Printf("Car: %s\n\n", carDAO.EntityInfo.GetGreateTableStatement())
+	//udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
+	//log.Printf("Car UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
+	//log.Printf("Car: %s\n\n", carDAO.EntityInfo.GetGreateTableStatement())
 
 	for _, index := range carDAO.EntityInfo.Indexes {
 		var count int
@@ -154,50 +154,166 @@ func TestExample02(t *testing.T) {
 	}
 	AssertEqual(t, count, 1)
 
-	car := Car{
-		Id:     gocql.TimeUUID(),
-		Brand:  "Toy",
-		Model:  "Prado",
-		Year:   2024,
-		Colors: []string{"red", "blue", "green"},
-		PriceLog: CarPriceLog{
-			Price:     100000,
-			CreatedAt: time.Now(),
-		},
-		Reward: CarReward{
-			Name:   "Best",
-			Cert:   "Good",
-			Reward: 120000,
-		},
-		Matrix: [][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}},
-		Levels: []int{1, 2, 3},
-		Distributions: map[string]int{
-			"VN": 100,
-			"US": 200,
-			"UK": 300,
-		},
-		MatrixMap: map[string][][]float64{
-			"VN": {{1.1, 1.2, 1.3}, {1.4, 1.5, 1.6}, {1.7, 1.8, 1.9}},
-			"US": {{2.1, 2.2, 2.3}, {2.4, 2.5, 2.6}, {2.7, 2.8, 2.9}},
-			"UK": {{3.1, 3.2, 3.3}, {3.4, 3.5, 3.6}, {3.7, 3.8, 3.9}},
-		},
-		ThisIgnoreField:     "BBBBB",
-		thisUnexportedField: "CCCCC",
+	var carEntities []cqlxoEntity.BaseModelInterface
+	for i := 2024; i < 2050; i++ {
+		car := Car{
+			Id:     gocql.TimeUUID(),
+			Brand:  "MyBrand",
+			Model:  fmt.Sprintf("Model-%d", i),
+			Year:   i,
+			Name:   fmt.Sprintf("%d", i),
+			Colors: []string{"red", "blue", "green"},
+			PriceLog: CarPriceLog{
+				Price:     100000,
+				CreatedAt: time.Now(),
+			},
+			Reward: CarReward{
+				Name:   "Best",
+				Cert:   "Good",
+				Reward: 120000,
+			},
+			Matrix: [][]int{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}},
+			Levels: []int{1, 2, 3},
+			Distributions: map[string]int{
+				"VN": 100,
+				"US": 200,
+				"UK": 300,
+			},
+			MatrixMap: map[string][][]float64{
+				"VN": {{1.1, 1.2, 1.3}, {1.4, 1.5, 1.6}, {1.7, 1.8, 1.9}},
+				"US": {{2.1, 2.2, 2.3}, {2.4, 2.5, 2.6}, {2.7, 2.8, 2.9}},
+				"UK": {{3.1, 3.2, 3.3}, {3.4, 3.5, 3.6}, {3.7, 3.8, 3.9}},
+			},
+			ThisIgnoreField:     "BBBBB",
+			thisUnexportedField: "CCCCC",
+		}
+
+		carEntities = append(carEntities, car)
 	}
-	err = carDAO.Save(car)
+	err = carDAO.SaveMany(carEntities)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
 
-	var cars []Car
-	err = carDAO.FindAll(&cars)
+	/////////////////////////////FIND ALL///////////////////////////////////////////
+	findAll := func(carDAO *CarDAO) ([]Car, error) {
+		var cars []Car
+		err = carDAO.FindAll(&cars)
+		return cars, err
+	}
+
+	cars, err := findAll(carDAO)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
+	AssertEqual(t, len(cars), len(carEntities))
 
-	log.Println("cars", cars)
+	/////////////////////////////FIND ALL WITH PAGINATION///////////////////////////////////////////
+
+	/////////////////////////////FIND WITH PRIMARY KEY///////////////////////////////////////////
+	findWithPrimKey := func(carDAO *CarDAO, id gocql.UUID, year int) (*Car, error) {
+		var cars []Car
+		err = carDAO.FindByPrimaryKey(Car{
+			Id:   carEntities[0].(Car).Id,
+			Year: carEntities[0].(Car).Year,
+		}, &cars)
+
+		if err != nil {
+			return nil, err
+		}
+		if len(cars) == 0 {
+			return nil, nil
+		}
+		return &cars[0], nil
+	}
+
+	car, err := findWithPrimKey(carDAO, carEntities[0].(Car).Id, carEntities[0].(Car).Year)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, car != nil, true)
+	AssertEqual(t, car.Id, carEntities[0].(Car).Id)
+	AssertEqual(t, car.Year, carEntities[0].(Car).Year)
+
+	////////////////////////////FIND WITH INDEX////////////////////////////////////////////
+	findWithIndex := func(carDAO *CarDAO, brand string) ([]Car, error) {
+		var cars []Car
+		err = carDAO.Find(Car{
+			Brand: brand,
+		}, false, &cars)
+		return cars, err
+	}
+
+	cars, err = findWithIndex(carDAO, "MyBrand")
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(cars), len(carEntities))
+
+	////////////////////////////FIND WITH INDEX WITH PAGINATION////////////////////////////////////////////
+	findWithPagination := func(carDAO *CarDAO, c Car, itemsPerPage int, allowFiltering bool) ([]Car, error) {
+		log.Print("Find with pagination", c)
+		var (
+			cars []Car
+			page []byte
+		)
+		for i := 0; ; i++ {
+			var mCars []Car
+
+			nextPage, err := carDAO.FindWithOption(c, cqlxoDAO.QueryOption{
+				Page:           page,
+				ItemsPerPage:   itemsPerPage,
+				AllowFiltering: allowFiltering,
+			}, &mCars)
+
+			if err != nil {
+				return nil, err
+			}
+
+			cars = append(cars, mCars...)
+
+			t.Logf("Page: %d -  items: %d", i, len(mCars))
+			for _, car := range mCars {
+				log.Println(car.Model)
+			}
+
+			page = nextPage
+			if len(nextPage) == 0 {
+				break
+			}
+		}
+
+		return cars, nil
+	}
+
+	cars, err = findWithPagination(carDAO, Car{
+		Brand: "MyBrand",
+	}, 5, false)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(cars), len(carEntities))
+
+	////////////////////////////FIND WITH ALLOW FILTERING WITH PAGINATION////////////////////////////////////////////
+
+	_, err = findWithPagination(carDAO, Car{
+		Name: "2024",
+	}, 5, false)
+	AssertEqual(t, err != nil, true)
+
+	cars, err = findWithPagination(carDAO, Car{
+		Name: "2024",
+	}, 5, true)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(cars), 1)
 
 	////////////////////////////DELETE ALL////////////////////////////////////////////
 	err = carDAO.DeleteAll()

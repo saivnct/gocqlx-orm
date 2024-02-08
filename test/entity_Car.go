@@ -9,6 +9,7 @@ type Car struct {
 	Brand               string                 `db:"brand" index:"true"`
 	Model               string                 `db:"model" index:"true"`
 	Year                int                    `db:"year" ck:"1"`
+	Name                string                 `db:"name" `
 	Colors              []string               `db:"colors"`
 	PriceLog            CarPriceLog            `db:"price_log"`
 	Reward              CarReward              `db:"reward"` //year - reward

@@ -23,6 +23,14 @@ type DAO struct {
 	Session    gocqlx.Session
 }
 
+type QueryOption struct {
+	AllowFiltering bool
+	Page           []byte
+	ItemsPerPage   int
+	OrderBy        string
+	Order          qb.Order
+}
+
 func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseModelInterface) error {
 	entityInfo, err := cqlxoCodec.ParseTableMetaData(m)
 	if err != nil {
@@ -171,6 +179,8 @@ func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface, res
 		return InvalidPartitionKey
 	}
 
+	//log.Print(queryMap)
+
 	var cmps = getCmp(queryMap)
 	q := qb.
 		Select(d.EntityInfo.TableMetaData.Name).
@@ -214,6 +224,42 @@ func (d *DAO) Find(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bo
 	q := sBuilder.Query(d.Session).BindMap(queryMap)
 
 	return q.SelectRelease(result)
+}
+
+func (d *DAO) FindWithOption(queryEntity cqlxoEntity.BaseModelInterface, option QueryOption, result interface{}) (nextPage []byte, err error) {
+	if d.Session.Session == nil {
+		return nil, NoSessionError
+	}
+
+	sBuilder := qb.
+		Select(d.EntityInfo.TableMetaData.Name).
+		Columns(d.EntityInfo.TableMetaData.Columns...)
+
+	var queryMap qb.M
+	if queryEntity != nil {
+		columns := d.EntityInfo.TableMetaData.Columns
+		queryMap = d.getQueryMap(queryEntity, columns)
+		cmps := getCmp(queryMap)
+		sBuilder = sBuilder.Where(cmps...)
+	}
+
+	if option.AllowFiltering {
+		sBuilder.AllowFiltering()
+	}
+
+	if len(option.OrderBy) > 0 {
+		sBuilder.OrderBy(option.OrderBy, option.Order)
+	}
+	q := sBuilder.Query(d.Session)
+	if queryMap != nil {
+		q = q.BindMap(queryMap)
+	}
+	defer q.Release()
+	q.PageState(option.Page)
+	q.PageSize(option.ItemsPerPage)
+	iter := q.Iter()
+
+	return iter.PageState(), iter.Select(result)
 }
 
 func (d *DAO) CountAll() (int64, error) {

@@ -68,8 +68,8 @@ func TestExample03(t *testing.T) {
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.Indexes, []string{"name"}), true)
 
-	log.Printf("Book: %s\n\n", bookDAO.EntityInfo.TableMetaData)
-	log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetGreateTableStatement())
+	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.TableMetaData)
+	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetGreateTableStatement())
 
 	for _, index := range bookDAO.EntityInfo.Indexes {
 		var count int
@@ -103,7 +103,7 @@ func TestExample03(t *testing.T) {
 		return
 	}
 
-	var books []cqlxoEntity.BaseModelInterface
+	var bookEntities []cqlxoEntity.BaseModelInterface
 	for i := 1; i < 10; i++ {
 		book := Book{
 			Id:        gocql.TimeUUID(),
@@ -112,101 +112,137 @@ func TestExample03(t *testing.T) {
 			Content:   fmt.Sprintf("my deathnote %d", i),
 			CreatedAt: time.Now(),
 		}
-		books = append(books, book)
+		bookEntities = append(bookEntities, book)
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	err = bookDAO.SaveMany(books)
+	err = bookDAO.SaveMany(bookEntities)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
 
 	/////////////////////////////FIND ALL///////////////////////////////////////////
-	var dbBooks []Book
-	err = bookDAO.FindAll(&dbBooks)
+	findAll := func(bookDAO *BookDAO) ([]Book, error) {
+		var books []Book
+		err = bookDAO.FindAll(&books)
+		return books, err
+	}
+
+	books, err := findAll(bookDAO)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(books)+1, len(dbBooks))
+	AssertEqual(t, len(bookEntities)+1, len(books))
 
 	countAll, err := bookDAO.CountAll()
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, int64(len(books)+1), countAll)
+	AssertEqual(t, int64(len(bookEntities)+1), countAll)
+
+	/////////////////////////////FIND ALL///////////////////////////////////////////
+	findAll2 := func(bookDAO *BookDAO) ([]Book, error) {
+		var books []Book
+		err = bookDAO.Find(Book{}, false, &books)
+		return books, err
+	}
+
+	books, err = findAll2(bookDAO)
+	if err != nil {
+		t.Errorf(err.Error())
+		return
+	}
+	AssertEqual(t, len(bookEntities)+1, len(books))
 
 	/////////////////////////////FIND WITH PRIMARY KEY///////////////////////////////////////////
-	var dbBooks2 []Book
-	err = bookDAO.FindByPrimaryKey(Book{
-		Name:   "book",
-		Author: "Kira",
-	}, &dbBooks2)
+	findWithPrimKey := func(bookDAO *BookDAO, author string, name string, createdAt time.Time) (*Book, error) {
+		var books []Book
+		b := Book{
+			Author: author,
+			Name:   name,
+		}
+
+		if !createdAt.IsZero() {
+			b.CreatedAt = createdAt
+		}
+
+		err = bookDAO.FindByPrimaryKey(b, &books)
+
+		if err != nil {
+			return nil, err
+		}
+		if len(books) == 0 {
+			return nil, nil
+		}
+		return &books[0], nil
+	}
+
+	var zeroTime time.Time
+	_, err = findWithPrimKey(bookDAO, bookEntities[len(bookEntities)-1].(Book).Author, bookEntities[len(bookEntities)-1].(Book).Name, zeroTime)
 	AssertEqual(t, errors.Is(err, cqlxoDAO.InvalidPrimaryKey), true)
 
-	err = bookDAO.FindByPrimaryKey(Book{
-		Name:      "book",
-		Author:    "Kira",
-		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
-	}, &dbBooks2)
+	book, err := findWithPrimKey(bookDAO, bookEntities[len(bookEntities)-1].(Book).Author, bookEntities[len(bookEntities)-1].(Book).Name, bookEntities[len(bookEntities)-1].(Book).CreatedAt)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(dbBooks2), 1)
-	if len(dbBooks2) > 0 {
-		AssertEqual(t, dbBooks2[0].Author, "Kira")
-		AssertEqual(t, dbBooks2[0].Name, "book")
-		AssertEqual(t, dbBooks2[0].CreatedAt, dbBooks[len(dbBooks)-1].CreatedAt)
-	}
+	AssertEqual(t, book != nil, true)
+	AssertEqual(t, book.Author, bookEntities[len(bookEntities)-1].(Book).Author)
+	AssertEqual(t, book.Name, bookEntities[len(bookEntities)-1].(Book).Name)
+	AssertEqual(t, book.CreatedAt.UnixMilli(), bookEntities[len(bookEntities)-1].(Book).CreatedAt.UnixMilli())
 
 	/////////////////////////////FIND WITH PARTITION KEY///////////////////////////////////////////
-	var dbBooks3 []Book
-	err = bookDAO.FindByPartitionKey(Book{
-		Author: "Kira",
-	}, &dbBooks3)
+	findByPartitionKey := func(bookDAO *BookDAO, author string, name string) ([]Book, error) {
+		var books []Book
+		b := Book{}
+		if author != "" {
+			b.Author = author
+		}
+		if name != "" {
+			b.Name = name
+		}
+
+		err = bookDAO.FindByPartitionKey(b, &books)
+		return books, err
+	}
+
+	_, err = findByPartitionKey(bookDAO, "Kira", "")
 	AssertEqual(t, errors.Is(err, cqlxoDAO.InvalidPartitionKey), true)
 
-	err = bookDAO.FindByPartitionKey(Book{
-		Name:   "book",
-		Author: "Kira",
-	}, &dbBooks3)
+	books, err = findByPartitionKey(bookDAO, "Kira", "book")
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(books), len(dbBooks3))
-	for _, book := range dbBooks3 {
+	AssertEqual(t, len(bookEntities), len(books))
+	for _, book := range books {
 		AssertEqual(t, book.Author, "Kira")
 		AssertEqual(t, book.Name, "book")
 	}
 
-	/////////////////////////////FIND ALL///////////////////////////////////////////
-	var dbBooks4 []Book
-	err = bookDAO.Find(Book{}, false, &dbBooks4)
-	if err != nil {
-		t.Errorf(err.Error())
-		return
-	}
-	AssertEqual(t, len(books)+1, len(dbBooks4))
-
 	////////////////////////////FIND WITH ALLOW FILTERING////////////////////////////////////////////
-	var dbBooks5 []Book
-	err = bookDAO.Find(Book{
+	find := func(bookDAO *BookDAO, book Book, allowFiltering bool) ([]Book, error) {
+		var books []Book
+		err = bookDAO.Find(book, allowFiltering, &books)
+		return books, err
+	}
+
+	_, err = find(bookDAO, Book{
 		Author: "Kira",
-	}, false, &dbBooks5)
+	}, false)
 	AssertEqual(t, err != nil, true)
 
-	err = bookDAO.Find(Book{
+	books, err = find(bookDAO, Book{
 		Author: "Kira",
-	}, true, &dbBooks5)
+	}, true)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(books), len(dbBooks5))
+	AssertEqual(t, len(bookEntities), len(books))
 
 	////////////////////////////COUNT WITH ALLOW FILTERING////////////////////////////////////////////
 	countQuery, err := bookDAO.Count(Book{
@@ -224,16 +260,14 @@ func TestExample03(t *testing.T) {
 	AssertEqual(t, int64(1), countQuery)
 
 	////////////////////////////FIND WITH INDEX////////////////////////////////////////////
-	var dbBooks6 []Book
-	err = bookDAO.Find(Book{
+	books, err = find(bookDAO, Book{
 		Name: "book",
-	}, false, &dbBooks6)
-
+	}, false)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(books), len(dbBooks6))
+	AssertEqual(t, len(bookEntities), len(books))
 
 	////////////////////////////COUNT WITH INDEX////////////////////////////////////////////
 	countQuery, err = bookDAO.Count(Book{
@@ -249,25 +283,19 @@ func TestExample03(t *testing.T) {
 	err = bookDAO.DeleteByPrimaryKey(Book{
 		Name:      "book",
 		Author:    "Kira",
-		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
+		CreatedAt: bookEntities[len(bookEntities)-1].(Book).CreatedAt,
 	})
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
 
-	var dbBooks7 []Book
-	err = bookDAO.FindByPrimaryKey(Book{
-		Name:      "book",
-		Author:    "Kira",
-		CreatedAt: dbBooks[len(dbBooks)-1].CreatedAt,
-	}, &dbBooks7)
+	book, err = findWithPrimKey(bookDAO, "Kira", "book", bookEntities[len(bookEntities)-1].(Book).CreatedAt)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(dbBooks7), 0)
-
+	AssertEqual(t, book == nil, true)
 	////////////////////////////DELETE BY PARTITION KEY////////////////////////////////////////////
 	err = bookDAO.DeleteByPartitionKey(Book{
 		Name:   "book",
@@ -278,19 +306,15 @@ func TestExample03(t *testing.T) {
 		return
 	}
 
-	var dbBooks8 []Book
-	err = bookDAO.FindByPartitionKey(Book{
-		Name:   "book",
-		Author: "Kira",
-	}, &dbBooks8)
+	books, err = findByPartitionKey(bookDAO, "Kira", "book")
 	if err != nil {
 		t.Errorf(err.Error())
 		return
 	}
-	AssertEqual(t, len(dbBooks8), 0)
+	AssertEqual(t, len(books), 0)
 
 	////////////////////////////DELETE ALL////////////////////////////////////////////
-	err = bookDAO.SaveMany(books)
+	err = bookDAO.SaveMany(bookEntities)
 	if err != nil {
 		t.Errorf(err.Error())
 		return
