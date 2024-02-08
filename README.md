@@ -10,11 +10,15 @@ It’s developed based on [Gocqlx](https://github.com/scylladb/gocqlx) with supp
 * Auto create UDT if not exists
 * DAO (Data Access Object) for CRUD operations
 
+## Limitations
+* Not supported nested UDT and slice of UDT
+* Not supported Tuple 
+
 
 ## Installation
 
 ```bash
-    go get github.com/saivnct/gocqlx-orm
+    go get github.com/saivnct/gocqlx-orm@v1.0.0
 ```
 
 ## Getting started
