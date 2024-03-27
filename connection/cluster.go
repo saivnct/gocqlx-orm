@@ -21,8 +21,8 @@ func CreateCluster(hosts []string, keyspace string, consistencyLevel gocql.Consi
 
 	cluster.Timeout = time.Duration(clusterTimeout) * time.Second
 	cluster.RetryPolicy = retryPolicy
-
 	cluster.Consistency = consistencyLevel
+
 	if localDC != "" {
 		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.DCAwareRoundRobinPolicy(localDC))
 	} else {
