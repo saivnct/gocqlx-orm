@@ -7,7 +7,7 @@ import (
 	"github.com/gocql/gocql"
 )
 
-func CreateCluster(hosts []string, keyspace string, localDC string, clusterTimeout int, numRetries int) (*gocql.ClusterConfig, *gocqlx.Session, error) {
+func CreateCluster(hosts []string, keyspace string, consistencyLevel gocql.Consistency, localDC string, clusterTimeout int, numRetries int) (*gocql.ClusterConfig, *gocqlx.Session, error) {
 	retryPolicy := &gocql.ExponentialBackoffRetryPolicy{
 		Min:        time.Second,
 		Max:        10 * time.Second,
@@ -21,12 +21,11 @@ func CreateCluster(hosts []string, keyspace string, localDC string, clusterTimeo
 
 	cluster.Timeout = time.Duration(clusterTimeout) * time.Second
 	cluster.RetryPolicy = retryPolicy
+	cluster.Consistency = consistencyLevel
 
 	if localDC != "" {
-		cluster.Consistency = gocql.LocalQuorum
 		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.DCAwareRoundRobinPolicy(localDC))
 	} else {
-		cluster.Consistency = gocql.Quorum
 		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
 	}
 
