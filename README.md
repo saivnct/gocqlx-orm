@@ -18,7 +18,7 @@ It’s developed based on [Gocqlx](https://github.com/scylladb/gocqlx) with supp
 ## Installation
 
 ```bash
-    go get github.com/saivnct/gocqlx-orm@v1.0.0
+    go get github.com/saivnct/gocqlx-orm@v1.0.2
 ```
 
 ## Getting started
