@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/connection"
 	"github.com/scylladb/gocqlx/v2"
 	"os"
@@ -13,6 +14,7 @@ var (
 	clusterTimeout = 10
 	numRetries     = 5
 	localDC        = ""
+	consistencyLV  = "LOCAL_ONE"
 )
 
 func TestMain(m *testing.M) {
@@ -31,7 +33,7 @@ func CloseTestEnv() {
 }
 
 func SetUpKeySpace(keyspace string) error {
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "", localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "", gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
 	if err != nil {
 		return err
 	}
