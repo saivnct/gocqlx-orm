@@ -25,7 +25,7 @@ func TestExample03(t *testing.T) {
 
 	log.Printf("working keyspace: %s\n", keyspace)
 
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, keyspace, localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, keyspace, gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
 	if err != nil {
 		t.Errorf("Unable to connect to cluster")
 		return
