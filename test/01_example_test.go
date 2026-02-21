@@ -2,15 +2,16 @@ package test
 
 import (
 	"fmt"
+	"log"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/codec"
 	"github.com/saivnct/gocqlx-orm/connection"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
 	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
-	"log"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestExample01(t *testing.T) {
@@ -38,7 +39,7 @@ func TestExample01(t *testing.T) {
 	//UDT type declare in entity Person but not implemented BaseUDTInterface => that means it already created in DB
 	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS citizen_id (id text, end_at timestamp, created_at timestamp, level int)")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -85,23 +86,23 @@ func TestExample01(t *testing.T) {
 			Elements: []gocql.UDTField{
 				{
 					Name: "city",
-					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeText),
 				},
 				{
 					Name: "country",
-					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeText),
 				},
 				{
 					Name: "population",
-					Type: gocql.NewNativeType(5, gocql.TypeBigInt, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeBigInt),
 				},
 				{
 					Name: "check_point",
-					Type: gocql.NewNativeType(5, gocql.TypeList, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeList),
 				},
 				{
 					Name: "rating",
-					Type: gocql.NewNativeType(5, gocql.TypeInt, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeInt),
 				},
 			},
 		},
@@ -110,19 +111,19 @@ func TestExample01(t *testing.T) {
 			Elements: []gocql.UDTField{
 				{
 					Name: "id",
-					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeText),
 				},
 				{
 					Name: "end_at",
-					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeTimestamp),
 				},
 				{
 					Name: "created_at",
-					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeTimestamp),
 				},
 				{
 					Name: "level",
-					Type: gocql.NewNativeType(5, gocql.TypeInt, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeInt),
 				},
 			},
 		},
@@ -144,7 +145,7 @@ func TestExample01(t *testing.T) {
 		var count int
 		err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.types WHERE keyspace_name = '%s' AND type_name = '%s'", keyspace, udt.Name), nil).Get(&count)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 			return
 		}
 		AssertEqual(t, count, 1)
@@ -162,7 +163,7 @@ func TestExample01(t *testing.T) {
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 			return
 		}
 		AssertEqual(t, count, 1)
@@ -171,7 +172,7 @@ func TestExample01(t *testing.T) {
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Person{}.TableName()), nil).Get(&count)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, count, 1)
@@ -209,7 +210,7 @@ func TestExample01(t *testing.T) {
 	var persons []Person
 	err = personDAO.FindAll(&persons)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -218,7 +219,7 @@ func TestExample01(t *testing.T) {
 	////////////////////////////DELETE ALL////////////////////////////////////////////
 	err = personDAO.DeleteAll()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 }

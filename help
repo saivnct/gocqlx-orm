@@ -1,5 +1,5 @@
-Not supporting:
+Currently, this library is Not supporting:
 - Tuple
-- nested UDT
-- collection (list, set, map) of UDT
-
+- Nested UDT
+- Collection (list, set, map) of UDT
+I will add support for these features in the future. If you have any questions or suggestions, please feel free to contact me.

@@ -3,16 +3,17 @@ package cqlxoCodec
 import (
 	"errors"
 	"fmt"
+	"reflect"
+	"slices"
+	"strconv"
+	"strings"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
 	"github.com/scylladb/go-reflectx"
-	"github.com/scylladb/gocqlx/v2/table"
-	"reflect"
-	"slices"
-	"strconv"
-	"strings"
+	"github.com/scylladb/gocqlx/v3/table"
 )
 
 var (

@@ -2,10 +2,11 @@ package cqlxoCodec
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
-	"github.com/scylladb/gocqlx/v2/table"
-	"strings"
+	"github.com/scylladb/gocqlx/v3/table"
 )
 
 type EntityInfo struct {

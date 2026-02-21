@@ -3,8 +3,9 @@ package cqlxoCodec
 import (
 	"bytes"
 	"fmt"
-	"github.com/gocql/gocql"
 	"strings"
+
+	"github.com/gocql/gocql"
 )
 
 func GetCqlTypeInfo(cqlType gocql.TypeInfo) string {

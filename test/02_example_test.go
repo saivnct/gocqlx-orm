@@ -2,14 +2,15 @@ package test
 
 import (
 	"fmt"
+	"log"
+	"testing"
+	"time"
+
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/connection"
 	"github.com/saivnct/gocqlx-orm/dao"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
-	"log"
-	"testing"
-	"time"
 )
 
 func TestExample02(t *testing.T) {
@@ -79,11 +80,11 @@ func TestExample02(t *testing.T) {
 			Elements: []gocql.UDTField{
 				{
 					Name: "price",
-					Type: gocql.NewNativeType(5, gocql.TypeDouble, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeDouble),
 				},
 				{
 					Name: "created_at",
-					Type: gocql.NewNativeType(5, gocql.TypeTimestamp, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeTimestamp),
 				},
 			},
 		},
@@ -92,15 +93,15 @@ func TestExample02(t *testing.T) {
 			Elements: []gocql.UDTField{
 				{
 					Name: "name",
-					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeText),
 				},
 				{
 					Name: "cert",
-					Type: gocql.NewNativeType(5, gocql.TypeText, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeText),
 				},
 				{
 					Name: "reward",
-					Type: gocql.NewNativeType(5, gocql.TypeDouble, ""),
+					Type: gocql.NewNativeType(5, gocql.TypeDouble),
 				},
 			},
 		},
@@ -122,7 +123,7 @@ func TestExample02(t *testing.T) {
 		var count int
 		err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.types WHERE keyspace_name = '%s' AND type_name = '%s'", keyspace, udt.Name), nil).Get(&count)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 			return
 		}
 		AssertEqual(t, count, 1)
@@ -140,7 +141,7 @@ func TestExample02(t *testing.T) {
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 			return
 		}
 		AssertEqual(t, count, 1)
@@ -149,7 +150,7 @@ func TestExample02(t *testing.T) {
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Car{}.TableName()), nil).Get(&count)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, count, 1)
@@ -192,7 +193,7 @@ func TestExample02(t *testing.T) {
 	}
 	err = carDAO.SaveMany(carEntities)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -205,7 +206,7 @@ func TestExample02(t *testing.T) {
 
 	cars, err := findAll(carDAO)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(cars), len(carEntities))
@@ -231,7 +232,7 @@ func TestExample02(t *testing.T) {
 
 	car, err := findWithPrimKey(carDAO, carEntities[0].(Car).Id, carEntities[0].(Car).Year)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, car != nil, true)
@@ -249,7 +250,7 @@ func TestExample02(t *testing.T) {
 
 	cars, err = findWithIndex(carDAO, "MyBrand")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(cars), len(carEntities))
@@ -294,7 +295,7 @@ func TestExample02(t *testing.T) {
 		Brand: "MyBrand",
 	}, 5, false)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(cars), len(carEntities))
@@ -310,7 +311,7 @@ func TestExample02(t *testing.T) {
 		Name: "2024",
 	}, 5, true)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(cars), 1)
@@ -318,7 +319,7 @@ func TestExample02(t *testing.T) {
 	////////////////////////////DELETE ALL////////////////////////////////////////////
 	err = carDAO.DeleteAll()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 

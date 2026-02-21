@@ -1,8 +1,9 @@
 package cqlxo_connection
 
 import (
-	"github.com/scylladb/gocqlx/v2"
 	"time"
+
+	"github.com/scylladb/gocqlx/v3"
 
 	"github.com/gocql/gocql"
 )

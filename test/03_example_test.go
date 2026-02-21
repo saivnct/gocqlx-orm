@@ -3,15 +3,16 @@ package test
 import (
 	"errors"
 	"fmt"
+	"log"
+	"testing"
+	"time"
+
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/connection"
 	"github.com/saivnct/gocqlx-orm/dao"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
-	"github.com/scylladb/gocqlx/v2/qb"
-	"log"
-	"testing"
-	"time"
+	"github.com/scylladb/gocqlx/v3/qb"
 )
 
 func TestExample03(t *testing.T) {
@@ -39,7 +40,7 @@ func TestExample03(t *testing.T) {
 	//UDT type declare in entity Person but not implemented BaseUDTInterface => that means it already created in DB
 	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS working_document (name text, created_at timestamp)")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -78,7 +79,7 @@ func TestExample03(t *testing.T) {
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		if err != nil {
-			t.Errorf(err.Error())
+			t.Error(err)
 			return
 		}
 		AssertEqual(t, count, 1)
@@ -87,7 +88,7 @@ func TestExample03(t *testing.T) {
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Book{}.TableName()), nil).Get(&count)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, count, 1)
@@ -100,7 +101,7 @@ func TestExample03(t *testing.T) {
 		CreatedAt: time.Now(),
 	})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -119,7 +120,7 @@ func TestExample03(t *testing.T) {
 
 	err = bookDAO.SaveMany(bookEntities)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
@@ -132,14 +133,14 @@ func TestExample03(t *testing.T) {
 
 	books, err := findAll(bookDAO)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(bookEntities)+1, len(books))
 
 	countAll, err := bookDAO.CountAll()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, int64(len(bookEntities)+1), countAll)
@@ -153,7 +154,7 @@ func TestExample03(t *testing.T) {
 
 	books, err = findAll2(bookDAO)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(bookEntities)+1, len(books))
@@ -187,7 +188,7 @@ func TestExample03(t *testing.T) {
 
 	book, err := findWithPrimKey(bookDAO, bookEntities[len(bookEntities)-1].(Book).Author, bookEntities[len(bookEntities)-1].(Book).Name, bookEntities[len(bookEntities)-1].(Book).CreatedAt)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, book != nil, true)
@@ -215,7 +216,7 @@ func TestExample03(t *testing.T) {
 
 	books, err = findByPartitionKey(bookDAO, "Kira", "book")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(bookEntities), len(books))
@@ -240,7 +241,7 @@ func TestExample03(t *testing.T) {
 		Author: "Kira",
 	}, true)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(bookEntities), len(books))
@@ -255,7 +256,7 @@ func TestExample03(t *testing.T) {
 		Author: "Kira 2",
 	}, true)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, int64(1), countQuery)
@@ -265,7 +266,7 @@ func TestExample03(t *testing.T) {
 		Name: "book",
 	}, false)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(bookEntities), len(books))
@@ -275,7 +276,7 @@ func TestExample03(t *testing.T) {
 		Name: "book 2",
 	}, false)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, int64(1), countQuery)
@@ -322,7 +323,7 @@ func TestExample03(t *testing.T) {
 		Author: "Kira",
 	}, 5, "created_at", qb.DESC)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(books), len(bookEntities))
@@ -334,13 +335,13 @@ func TestExample03(t *testing.T) {
 		CreatedAt: bookEntities[len(bookEntities)-1].(Book).CreatedAt,
 	})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
 	book, err = findWithPrimKey(bookDAO, "Kira", "book", bookEntities[len(bookEntities)-1].(Book).CreatedAt)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, book == nil, true)
@@ -350,13 +351,13 @@ func TestExample03(t *testing.T) {
 		Author: "Kira",
 	})
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
 	books, err = findByPartitionKey(bookDAO, "Kira", "book")
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, len(books), 0)
@@ -364,19 +365,19 @@ func TestExample03(t *testing.T) {
 	////////////////////////////DELETE ALL////////////////////////////////////////////
 	err = bookDAO.SaveMany(bookEntities)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
 	err = bookDAO.DeleteAll()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 
 	countAll, err = bookDAO.CountAll()
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Error(err)
 		return
 	}
 	AssertEqual(t, int64(0), countAll)

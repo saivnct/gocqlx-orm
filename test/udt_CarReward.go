@@ -1,6 +1,6 @@
 package test
 
-import "github.com/scylladb/gocqlx/v2"
+import "github.com/scylladb/gocqlx/v3"
 
 type CarReward struct {
 	gocqlx.UDT

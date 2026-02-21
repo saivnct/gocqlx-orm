@@ -1,12 +1,16 @@
 package test
 
 import (
+	"context"
 	"fmt"
-	"github.com/gocql/gocql"
-	"github.com/saivnct/gocqlx-orm/connection"
-	"github.com/scylladb/gocqlx/v2"
+	"log"
 	"os"
 	"testing"
+
+	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/connection"
+	"github.com/scylladb/gocqlx/v3"
+	"github.com/testcontainers/testcontainers-go/modules/scylladb"
 )
 
 var (
@@ -25,7 +29,34 @@ func TestMain(m *testing.M) {
 }
 
 func InitTestEnv() {
+	// if we crash the go code, we get the file and line number
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
+	log.Print("Init test environment")
+
+	scyllaContainerCtx := context.Background()
+	scyllaContainer, err := scylladb.Run(
+		context.Background(),
+		"scylladb/scylla:5.2",
+		scylladb.WithCustomCommands("--memory=1G", "--smp=1", "--overprovisioned=1", "--api-address=0.0.0.0"),
+	)
+	if err != nil {
+		log.Fatalf("Failed to init scyllaContainer %v", err)
+	}
+
+	scyllaHost, err := scyllaContainer.Host(scyllaContainerCtx)
+	if err != nil {
+		log.Fatalf("Failed to init scyllaContainer %v", err)
+	}
+	log.Printf("ScyllaDB container scyllaHost: %s\n", scyllaHost)
+
+	scyllaPort, err := scyllaContainer.MappedPort(scyllaContainerCtx, "9042/tcp")
+	if err != nil {
+		log.Fatalf("Failed to init scyllaContainer %v", err)
+	}
+	log.Printf("ScyllaDB container scyllaPort: %s\n", scyllaPort)
+
+	hosts = []string{fmt.Sprintf("%s:%s", scyllaHost, scyllaPort.Port())}
 }
 
 func CloseTestEnv() {

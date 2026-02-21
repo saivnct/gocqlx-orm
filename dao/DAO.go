@@ -3,12 +3,13 @@ package cqlxoDAO
 import (
 	"errors"
 	"fmt"
+	"reflect"
+
 	"github.com/saivnct/gocqlx-orm/codec"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
-	"github.com/scylladb/gocqlx/v2"
-	"github.com/scylladb/gocqlx/v2/qb"
-	"reflect"
+	"github.com/scylladb/gocqlx/v3"
+	"github.com/scylladb/gocqlx/v3/qb"
 )
 
 var (

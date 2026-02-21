@@ -2,7 +2,7 @@ package test
 
 import (
 	"github.com/saivnct/gocqlx-orm/dao"
-	"github.com/scylladb/gocqlx/v2"
+	"github.com/scylladb/gocqlx/v3"
 )
 
 type CarDAO struct {

@@ -2,16 +2,17 @@ package cqlxoCodec
 
 import (
 	"fmt"
-	"github.com/gocql/gocql"
-	"github.com/saivnct/gocqlx-orm/entity"
-	"github.com/scylladb/go-reflectx"
-	"github.com/scylladb/gocqlx/v2"
-	"gopkg.in/inf.v0"
 	"math/big"
 	"reflect"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/gocql/gocql"
+	"github.com/saivnct/gocqlx-orm/entity"
+	"github.com/scylladb/go-reflectx"
+	"github.com/scylladb/gocqlx/v3"
+	"gopkg.in/inf.v0"
 )
 
 // convertToDefaultCqlType - Convert from go Type to CQL Type - based on gocql -> helpers.go -> goType()
@@ -22,45 +23,45 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 
 	switch t {
 	case reflect.TypeOf(*new(string)):
-		return gocql.NewNativeType(5, gocql.TypeText, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeText), nil
 	case reflect.TypeOf(*new(time.Duration)):
-		return gocql.NewNativeType(5, gocql.TypeDuration, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeDuration), nil
 	case reflect.TypeOf(*new(time.Time)):
-		return gocql.NewNativeType(5, gocql.TypeTimestamp, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeTimestamp), nil
 	case reflect.TypeOf(*new([]byte)):
-		return gocql.NewNativeType(5, gocql.TypeBlob, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeBlob), nil
 	case reflect.TypeOf(*new(bool)):
-		return gocql.NewNativeType(5, gocql.TypeBoolean, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeBoolean), nil
 	case reflect.TypeOf(*new(float32)):
-		return gocql.NewNativeType(5, gocql.TypeFloat, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeFloat), nil
 	case reflect.TypeOf(*new(float64)):
-		return gocql.NewNativeType(5, gocql.TypeDouble, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeDouble), nil
 	case reflect.TypeOf(*new(int)):
-		return gocql.NewNativeType(5, gocql.TypeInt, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeInt), nil
 	case reflect.TypeOf(*new(int64)):
-		return gocql.NewNativeType(5, gocql.TypeBigInt, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeBigInt), nil
 	case reflect.TypeOf(*new(*big.Int)):
-		return gocql.NewNativeType(5, gocql.TypeVarint, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeVarint), nil
 	case reflect.TypeOf(*new(int16)):
-		return gocql.NewNativeType(5, gocql.TypeSmallInt, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeSmallInt), nil
 	case reflect.TypeOf(*new(int8)):
-		return gocql.NewNativeType(5, gocql.TypeTinyInt, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeTinyInt), nil
 	case reflect.TypeOf(*new(*inf.Dec)):
-		return gocql.NewNativeType(5, gocql.TypeDecimal, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeDecimal), nil
 	case reflect.TypeOf(*new(gocql.UUID)):
-		return gocql.NewNativeType(5, gocql.TypeUUID, ""), nil
+		return gocql.NewNativeType(5, gocql.TypeUUID), nil
 	default:
 		{
 			if t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
 				elemTypeInfo, err := convertToDefaultCqlType(t.Elem())
 				typeInfo := gocql.CollectionType{
-					NativeType: gocql.NewNativeType(5, gocql.TypeList, ""),
+					NativeType: gocql.NewNativeType(5, gocql.TypeList),
 					Elem:       elemTypeInfo,
 				}
 				return typeInfo, err
 			} else if t.Kind() == reflect.Map {
 				typeInfo := &gocql.CollectionType{
-					NativeType: gocql.NewNativeType(5, gocql.TypeMap, ""),
+					NativeType: gocql.NewNativeType(5, gocql.TypeMap),
 				}
 				keyTypeInfo, err := convertToDefaultCqlType(t.Key())
 				if err != nil {
@@ -78,7 +79,7 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 				var tVal reflect.Value = reflect.New(t)
 				if baseUDT, ok := tVal.Elem().Interface().(gocqlx.UDT); ok {
 					typeInfo := &gocql.UDTTypeInfo{
-						NativeType: gocql.NewNativeType(5, gocql.TypeUDT, ""),
+						NativeType: gocql.NewNativeType(5, gocql.TypeUDT),
 						Name:       reflectx.CamelToSnakeASCII(t.Name()),
 					}
 					udtFields, err := convertToCqlUDT(baseUDT)
@@ -92,7 +93,7 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 				var tVal reflect.Value = reflect.New(t)
 				if baseTuple, ok := tVal.Elem().Interface().(cqlxoEntity.Tuple); ok {
 					typeInfo := &gocql.TupleTypeInfo{
-						NativeType: gocql.NewNativeType(5, gocql.TypeTuple, ""),
+						NativeType: gocql.NewNativeType(5, gocql.TypeTuple),
 					}
 
 					tupleFields, err := convertToCqlTuple(baseTuple)
@@ -103,7 +104,7 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 					return *typeInfo, nil
 				}
 			}
-			return gocql.NewNativeType(0, gocql.TypeCustom, ""), fmt.Errorf("cannot create Go type for unknown CQL type %s", t)
+			return gocql.NewNativeType(0, gocql.TypeCustom), fmt.Errorf("cannot create Go type for unknown CQL type %s", t)
 		}
 
 	}
@@ -310,24 +311,24 @@ func getCqlType(name string) (gocql.TypeInfo, error) {
 	} else if strings.HasPrefix(name, "set<") {
 		elemTypeInfo, err := getCqlType(strings.TrimPrefix(name[:len(name)-1], "set<"))
 		typeInfo := gocql.CollectionType{
-			NativeType: gocql.NewNativeType(5, gocql.TypeSet, ""),
+			NativeType: gocql.NewNativeType(5, gocql.TypeSet),
 			Elem:       elemTypeInfo,
 		}
 		return typeInfo, err
 	} else if strings.HasPrefix(name, "list<") {
 		elemTypeInfo, err := getCqlType(strings.TrimPrefix(name[:len(name)-1], "list<"))
 		return gocql.CollectionType{
-			NativeType: gocql.NewNativeType(5, gocql.TypeList, ""),
+			NativeType: gocql.NewNativeType(5, gocql.TypeList),
 			Elem:       elemTypeInfo,
 		}, err
 	} else if strings.HasPrefix(name, "map<") {
 		names := splitCompositeTypes(strings.TrimPrefix(name[:len(name)-1], "map<"))
 		if len(names) != 2 {
-			return gocql.NewNativeType(0, gocql.TypeCustom, ""), fmt.Errorf("Error parsing map type, it has %d subelements, expecting 2\n", len(names))
+			return gocql.NewNativeType(0, gocql.TypeCustom), fmt.Errorf("Error parsing map type, it has %d subelements, expecting 2\n", len(names))
 		}
 
 		typeInfo := &gocql.CollectionType{
-			NativeType: gocql.NewNativeType(5, gocql.TypeMap, ""),
+			NativeType: gocql.NewNativeType(5, gocql.TypeMap),
 		}
 		keyTypeInfo, err := getCqlType(names[0])
 		if err != nil {
@@ -344,7 +345,7 @@ func getCqlType(name string) (gocql.TypeInfo, error) {
 		return *typeInfo, nil
 	} else if strings.HasPrefix(name, "tuple<") {
 		typeInfo := &gocql.TupleTypeInfo{
-			NativeType: gocql.NewNativeType(5, gocql.TypeTuple, ""),
+			NativeType: gocql.NewNativeType(5, gocql.TypeTuple),
 		}
 
 		names := splitCompositeTypes(strings.TrimPrefix(name[:len(name)-1], "tuple<"))
@@ -365,9 +366,9 @@ func getCqlType(name string) (gocql.TypeInfo, error) {
 
 		typ := getCqlBaseType(name)
 		if typ == gocql.TypeCustom {
-			typeInfo = gocql.NewNativeType(0, getCqlBaseType(name), name)
+			typeInfo = gocql.NewCustomType(0, getCqlBaseType(name), name)
 		} else {
-			typeInfo = gocql.NewNativeType(0, getCqlBaseType(name), "")
+			typeInfo = gocql.NewNativeType(0, getCqlBaseType(name))
 		}
 
 		return typeInfo, nil
