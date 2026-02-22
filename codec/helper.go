@@ -111,7 +111,8 @@ func ScanUDTs(cqlType gocql.TypeInfo) []gocql.UDTTypeInfo {
 func GetCqlCreateUDTStatement(cqlUDT gocql.UDTTypeInfo) string {
 	var udtFieldsDeclareSts []string
 	for _, udtField := range cqlUDT.Elements {
-		udtFieldsDeclareSts = append(udtFieldsDeclareSts, fmt.Sprintf("%s %s", udtField.Name, GetCqlTypeDeclareStatement(udtField.Type, false)))
+		shouldFreeze := udtField.Type.Type() == gocql.TypeUDT || udtField.Type.Type() == gocql.TypeTuple || udtField.Type.Type() == gocql.TypeCustom
+		udtFieldsDeclareSts = append(udtFieldsDeclareSts, fmt.Sprintf("%s %s", udtField.Name, GetCqlTypeDeclareStatement(udtField.Type, shouldFreeze)))
 	}
 
 	return fmt.Sprintf("CREATE TYPE IF NOT EXISTS %s (%s)", cqlUDT.Name, strings.Join(udtFieldsDeclareSts, ", "))

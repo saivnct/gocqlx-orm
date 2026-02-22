@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
+	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/codec"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
@@ -108,6 +110,15 @@ func (d *DAO) Save(entity cqlxoEntity.BaseModelInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
+
+	if d.hasTupleColumn() {
+		stmt, args, err := d.getInsertStmtAndArgs(entity)
+		if err != nil {
+			return err
+		}
+		return d.Session.Session.Query(stmt, args...).Exec()
+	}
+
 	q := d.Session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
 	//log.Printf("Save %s", q.String())
 	return q.ExecRelease()
@@ -116,6 +127,20 @@ func (d *DAO) Save(entity cqlxoEntity.BaseModelInterface) error {
 func (d *DAO) SaveMany(entities []cqlxoEntity.BaseModelInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
+	}
+
+	if d.hasTupleColumn() {
+		stmt := d.getInsertStmt()
+		for _, entity := range entities {
+			args, err := d.getInsertArgs(entity)
+			if err != nil {
+				return err
+			}
+			if err = d.Session.Session.Query(stmt, args...).Exec(); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	q := d.EntityInfo.Table.InsertQuery(d.Session)
@@ -129,14 +154,217 @@ func (d *DAO) SaveMany(entities []cqlxoEntity.BaseModelInterface) error {
 	return nil
 }
 
+func (d *DAO) hasTupleColumn() bool {
+	for _, column := range d.EntityInfo.Columns {
+		if column.Type.Type() == gocql.TypeTuple {
+			return true
+		}
+	}
+	return false
+}
+
+func (d *DAO) getInsertStmtAndArgs(entity cqlxoEntity.BaseModelInterface) (string, []interface{}, error) {
+	stmt := d.getInsertStmt()
+	args, err := d.getInsertArgs(entity)
+	return stmt, args, err
+}
+
+func (d *DAO) getInsertStmt() string {
+	columns := d.EntityInfo.TableMetaData.Columns
+	var placeholders []string
+
+	for _, colName := range columns {
+		colInfo, ok := d.getColumnInfo(colName)
+		if !ok || colInfo.Type.Type() != gocql.TypeTuple {
+			placeholders = append(placeholders, "?")
+			continue
+		}
+
+		tupleType := colInfo.Type.(gocql.TupleTypeInfo)
+		tuplePlaceholders := strings.Repeat("?,", len(tupleType.Elems))
+		placeholders = append(placeholders, fmt.Sprintf("(%s)", strings.TrimSuffix(tuplePlaceholders, ",")))
+	}
+
+	return fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+		d.EntityInfo.TableMetaData.Name,
+		strings.Join(columns, ", "),
+		strings.Join(placeholders, ", "),
+	)
+}
+
+func (d *DAO) getInsertArgs(entity cqlxoEntity.BaseModelInterface) ([]interface{}, error) {
+	v := reflect.ValueOf(entity)
+	for v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil, errors.New("entity must be a struct")
+	}
+
+	var args []interface{}
+	for _, colName := range d.EntityInfo.TableMetaData.Columns {
+		fieldName := d.EntityInfo.ColumFieldMap[colName]
+		fieldValue := v.FieldByName(fieldName)
+
+		colInfo, ok := d.getColumnInfo(colName)
+		if !ok || colInfo.Type.Type() != gocql.TypeTuple {
+			args = append(args, fieldValue.Interface())
+			continue
+		}
+
+		tupleElems, err := tupleStructToArgs(fieldValue)
+		if err != nil {
+			return nil, fmt.Errorf("tuple column %s: %w", colName, err)
+		}
+		tupleType := colInfo.Type.(gocql.TupleTypeInfo)
+		if len(tupleElems) != len(tupleType.Elems) {
+			return nil, fmt.Errorf("tuple column %s: expected %d fields, got %d", colName, len(tupleType.Elems), len(tupleElems))
+		}
+		args = append(args, tupleElems...)
+	}
+	return args, nil
+}
+
+func (d *DAO) getColumnInfo(colName string) (cqlxoCodec.ColumnInfo, bool) {
+	for _, col := range d.EntityInfo.Columns {
+		if col.Name == colName {
+			return col, true
+		}
+	}
+	return cqlxoCodec.ColumnInfo{}, false
+}
+
+func tupleStructToArgs(v reflect.Value) ([]interface{}, error) {
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil, errors.New("tuple value is nil")
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil, errors.New("tuple value must be a struct")
+	}
+
+	var elems []interface{}
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		elems = append(elems, v.Field(i).Interface())
+	}
+	return elems, nil
+}
+
+func (d *DAO) selectRelease(q *gocqlx.Queryx, result interface{}) error {
+	if !d.hasTupleColumn() {
+		return q.SelectRelease(result)
+	}
+	defer q.Release()
+	return d.scanTupleIter(q.Iter(), result)
+}
+
+func (d *DAO) scanTupleIter(iter *gocqlx.Iterx, result interface{}) error {
+	resultVal := reflect.ValueOf(result)
+	if resultVal.Kind() != reflect.Ptr || resultVal.IsNil() {
+		return errors.New("result must be a non-nil pointer to slice")
+	}
+
+	sliceVal := resultVal.Elem()
+	if sliceVal.Kind() != reflect.Slice {
+		return errors.New("result must be a pointer to slice")
+	}
+
+	elemType := sliceVal.Type().Elem()
+	scanner := iter.Scanner()
+
+	for scanner.Next() {
+		elem := reflect.New(elemType).Elem()
+		dest, err := d.buildTupleScanDest(elem)
+		if err != nil {
+			return err
+		}
+		if err = scanner.Scan(dest...); err != nil {
+			return err
+		}
+		sliceVal = reflect.Append(sliceVal, elem)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	resultVal.Elem().Set(sliceVal)
+	return nil
+}
+
+func (d *DAO) buildTupleScanDest(row reflect.Value) ([]interface{}, error) {
+	var dest []interface{}
+
+	for _, colName := range d.EntityInfo.TableMetaData.Columns {
+		fieldName, ok := d.EntityInfo.ColumFieldMap[colName]
+		if !ok || fieldName == "" {
+			return nil, fmt.Errorf("column %s has no field mapping", colName)
+		}
+
+		fieldVal := row.FieldByName(fieldName)
+		if !fieldVal.IsValid() {
+			return nil, fmt.Errorf("field %s not found for column %s", fieldName, colName)
+		}
+
+		colInfo, ok := d.getColumnInfo(colName)
+		if !ok || colInfo.Type.Type() != gocql.TypeTuple {
+			dest = append(dest, fieldVal.Addr().Interface())
+			continue
+		}
+
+		tupleType := colInfo.Type.(gocql.TupleTypeInfo)
+		tupleDest, err := tupleFieldPointers(fieldVal, len(tupleType.Elems))
+		if err != nil {
+			return nil, fmt.Errorf("tuple column %s: %w", colName, err)
+		}
+		dest = append(dest, tupleDest...)
+	}
+
+	return dest, nil
+}
+
+func tupleFieldPointers(v reflect.Value, expected int) ([]interface{}, error) {
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil, errors.New("tuple destination must be a struct")
+	}
+
+	var dest []interface{}
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if field.PkgPath != "" {
+			continue
+		}
+		dest = append(dest, v.Field(i).Addr().Interface())
+	}
+
+	if len(dest) != expected {
+		return nil, fmt.Errorf("expected %d tuple fields, got %d", expected, len(dest))
+	}
+
+	return dest, nil
+}
+
 func (d *DAO) FindAll(result interface{}) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
 
 	q := qb.Select(d.EntityInfo.TableMetaData.Name).Columns(d.EntityInfo.TableMetaData.Columns...).Query(d.Session)
-	err := q.SelectRelease(result)
-	return err
+	return d.selectRelease(q, result)
 }
 
 func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface, result interface{}) error {
@@ -163,7 +391,7 @@ func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface, resul
 		Query(d.Session).
 		BindMap(queryMap)
 
-	return q.SelectRelease(result)
+	return d.selectRelease(q, result)
 }
 
 func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface, result interface{}) error {
@@ -192,7 +420,7 @@ func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface, res
 		Query(d.Session).
 		BindMap(queryMap)
 
-	return q.SelectRelease(result)
+	return d.selectRelease(q, result)
 }
 
 func (d *DAO) Find(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bool, result interface{}) error {
@@ -226,7 +454,7 @@ func (d *DAO) Find(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bo
 
 	q := sBuilder.Query(d.Session).BindMap(queryMap)
 
-	return q.SelectRelease(result)
+	return d.selectRelease(q, result)
 }
 
 func (d *DAO) FindWithOption(queryEntity cqlxoEntity.BaseModelInterface, option QueryOption, result interface{}) (nextPage []byte, err error) {
@@ -261,8 +489,11 @@ func (d *DAO) FindWithOption(queryEntity cqlxoEntity.BaseModelInterface, option 
 	q.PageState(option.Page)
 	q.PageSize(option.ItemsPerPage)
 	iter := q.Iter()
-
-	return iter.PageState(), iter.Select(result)
+	next := iter.PageState()
+	if d.hasTupleColumn() {
+		return next, d.scanTupleIter(iter, result)
+	}
+	return next, iter.Select(result)
 }
 
 func (d *DAO) CountAll() (int64, error) {
@@ -276,6 +507,9 @@ func (d *DAO) CountAll() (int64, error) {
 	err := q.SelectRelease(&count)
 	if err != nil {
 		return 0, err
+	}
+	if len(count) == 0 {
+		return 0, nil
 	}
 
 	return count[0], err
@@ -382,12 +616,28 @@ func (d *DAO) DeleteByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface) e
 
 func (d *DAO) getQueryMap(queryEntity cqlxoEntity.BaseModelInterface, columnNames []string) qb.M {
 	v := reflect.ValueOf(queryEntity)
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return qb.M{}
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return qb.M{}
+	}
+
 	queryMap := qb.M{}
 	for _, columnName := range columnNames {
-		fieldName := d.EntityInfo.ColumFieldMap[columnName]
+		fieldName, ok := d.EntityInfo.ColumFieldMap[columnName]
+		if !ok || fieldName == "" {
+			continue
+		}
 		fieldValue := v.FieldByName(fieldName)
+		if !fieldValue.IsValid() {
+			continue
+		}
 		fieldType := fieldValue.Type()
-		if fieldValue.IsValid() && !reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(fieldType).Interface()) {
+		if !reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(fieldType).Interface()) {
 			queryMap[columnName] = fieldValue.Interface()
 		}
 	}

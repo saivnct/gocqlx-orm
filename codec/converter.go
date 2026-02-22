@@ -376,10 +376,16 @@ func getCqlType(name string) (gocql.TypeInfo, error) {
 }
 
 func splitCompositeTypes(name string) []string {
-	if !strings.Contains(name, "<") {
-		return strings.Split(name, ", ")
-	}
 	var parts []string
+	if !strings.Contains(name, "<") {
+		for _, segment := range strings.Split(name, ",") {
+			trimmed := strings.TrimSpace(segment)
+			if trimmed != "" {
+				parts = append(parts, trimmed)
+			}
+		}
+		return parts
+	}
 	lessCount := 0
 	segment := ""
 	for _, char := range name {

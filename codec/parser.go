@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
@@ -122,9 +121,6 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 						cqlType = reCheckCqlType
 					}
 				}
-
-				spew.Dump("custom cqlType:", cqlType)
-
 			}
 
 			//validate if Go type of field is matching with CQL type
@@ -167,6 +163,9 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			if pkIndex <= 0 {
 				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> wrong index format", InvalidPartitionKeyErr, tableName, field.Name)
 			}
+			if _, existed := pKeyMap[pkIndex]; existed {
+				return entityInfo, fmt.Errorf("%w -> table: %s, duplicate index %d", InvalidPartitionKeyErr, tableName, pkIndex)
+			}
 			pKeyMap[pkIndex] = colName
 			if pkIndex > maxPkeyIndex {
 				maxPkeyIndex = pkIndex
@@ -182,6 +181,9 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			}
 			if ckIndex <= 0 {
 				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> wrong index format", InvalidClusterKeyErr, tableName, field.Name)
+			}
+			if _, existed := cKeyMap[ckIndex]; existed {
+				return entityInfo, fmt.Errorf("%w -> table: %s, duplicate index %d", InvalidClusterKeyErr, tableName, ckIndex)
 			}
 			cKeyMap[ckIndex] = colName
 			if ckIndex > maxCkeyIndex {
