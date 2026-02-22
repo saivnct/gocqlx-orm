@@ -105,7 +105,7 @@ func TestExample03(t *testing.T) {
 		return
 	}
 
-	var bookEntities []cqlxoEntity.BaseModelInterface
+	var bookEntities []cqlxoEntity.BaseScyllaEntityInterface
 	for i := 1; i < 10; i++ {
 		book := Book{
 			Id:        gocql.TimeUUID(),

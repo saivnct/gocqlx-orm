@@ -34,7 +34,7 @@ type QueryOption struct {
 	Order          qb.Order
 }
 
-func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseModelInterface) error {
+func (d *DAO) InitDAO(session gocqlx.Session, m cqlxoEntity.BaseScyllaEntityInterface) error {
 	entityInfo, err := cqlxoCodec.ParseTableMetaData(m)
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func (d *DAO) checkAndCreateIndex() error {
 	return nil
 }
 
-func (d *DAO) Save(entity cqlxoEntity.BaseModelInterface) error {
+func (d *DAO) Save(entity cqlxoEntity.BaseScyllaEntityInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -124,7 +124,7 @@ func (d *DAO) Save(entity cqlxoEntity.BaseModelInterface) error {
 	return q.ExecRelease()
 }
 
-func (d *DAO) SaveMany(entities []cqlxoEntity.BaseModelInterface) error {
+func (d *DAO) SaveMany(entities []cqlxoEntity.BaseScyllaEntityInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -163,7 +163,7 @@ func (d *DAO) hasTupleColumn() bool {
 	return false
 }
 
-func (d *DAO) getInsertStmtAndArgs(entity cqlxoEntity.BaseModelInterface) (string, []interface{}, error) {
+func (d *DAO) getInsertStmtAndArgs(entity cqlxoEntity.BaseScyllaEntityInterface) (string, []interface{}, error) {
 	stmt := d.getInsertStmt()
 	args, err := d.getInsertArgs(entity)
 	return stmt, args, err
@@ -192,7 +192,7 @@ func (d *DAO) getInsertStmt() string {
 	)
 }
 
-func (d *DAO) getInsertArgs(entity cqlxoEntity.BaseModelInterface) ([]interface{}, error) {
+func (d *DAO) getInsertArgs(entity cqlxoEntity.BaseScyllaEntityInterface) ([]interface{}, error) {
 	v := reflect.ValueOf(entity)
 	for v.Kind() == reflect.Ptr {
 		v = v.Elem()
@@ -367,7 +367,7 @@ func (d *DAO) FindAll(result interface{}) error {
 	return d.selectRelease(q, result)
 }
 
-func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface, result interface{}) error {
+func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseScyllaEntityInterface, result interface{}) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -394,7 +394,7 @@ func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface, resul
 	return d.selectRelease(q, result)
 }
 
-func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface, result interface{}) error {
+func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseScyllaEntityInterface, result interface{}) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -423,7 +423,7 @@ func (d *DAO) FindByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface, res
 	return d.selectRelease(q, result)
 }
 
-func (d *DAO) Find(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bool, result interface{}) error {
+func (d *DAO) Find(queryEntity cqlxoEntity.BaseScyllaEntityInterface, allowFiltering bool, result interface{}) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -457,7 +457,7 @@ func (d *DAO) Find(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bo
 	return d.selectRelease(q, result)
 }
 
-func (d *DAO) FindWithOption(queryEntity cqlxoEntity.BaseModelInterface, option QueryOption, result interface{}) (nextPage []byte, err error) {
+func (d *DAO) FindWithOption(queryEntity cqlxoEntity.BaseScyllaEntityInterface, option QueryOption, result interface{}) (nextPage []byte, err error) {
 	if d.Session.Session == nil {
 		return nil, NoSessionError
 	}
@@ -515,7 +515,7 @@ func (d *DAO) CountAll() (int64, error) {
 	return count[0], err
 }
 
-func (d *DAO) Count(queryEntity cqlxoEntity.BaseModelInterface, allowFiltering bool) (int64, error) {
+func (d *DAO) Count(queryEntity cqlxoEntity.BaseScyllaEntityInterface, allowFiltering bool) (int64, error) {
 	if d.Session.Session == nil {
 		return 0, NoSessionError
 	}
@@ -560,7 +560,7 @@ func (d *DAO) DeleteAll() error {
 	return d.Session.ExecStmt(fmt.Sprintf("TRUNCATE %s", d.EntityInfo.TableMetaData.Name))
 }
 
-func (d *DAO) DeleteByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface) error {
+func (d *DAO) DeleteByPrimaryKey(queryEntity cqlxoEntity.BaseScyllaEntityInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -587,7 +587,7 @@ func (d *DAO) DeleteByPrimaryKey(queryEntity cqlxoEntity.BaseModelInterface) err
 	return q.ExecRelease()
 }
 
-func (d *DAO) DeleteByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface) error {
+func (d *DAO) DeleteByPartitionKey(queryEntity cqlxoEntity.BaseScyllaEntityInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
 	}
@@ -614,7 +614,7 @@ func (d *DAO) DeleteByPartitionKey(queryEntity cqlxoEntity.BaseModelInterface) e
 	return q.ExecRelease()
 }
 
-func (d *DAO) getQueryMap(queryEntity cqlxoEntity.BaseModelInterface, columnNames []string) qb.M {
+func (d *DAO) getQueryMap(queryEntity cqlxoEntity.BaseScyllaEntityInterface, columnNames []string) qb.M {
 	v := reflect.ValueOf(queryEntity)
 	for v.Kind() == reflect.Ptr {
 		if v.IsNil() {

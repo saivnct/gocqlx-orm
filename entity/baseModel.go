@@ -1,5 +1,5 @@
 package cqlxoEntity
 
-type BaseModelInterface interface {
+type BaseScyllaEntityInterface interface {
 	TableName() string
 }

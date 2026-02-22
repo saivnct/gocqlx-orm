@@ -89,9 +89,9 @@ func convertToDefaultCqlType(t reflect.Type) (gocql.TypeInfo, error) {
 					typeInfo.Elements = udtFields
 					return *typeInfo, nil
 				}
-			} else if t.Implements(reflect.TypeOf((*cqlxoEntity.Tuple)(nil)).Elem()) {
+			} else if t.Implements(reflect.TypeOf((*cqlxoEntity.BaseScyllaTupleInterface)(nil)).Elem()) {
 				var tVal reflect.Value = reflect.New(t)
-				if baseTuple, ok := tVal.Elem().Interface().(cqlxoEntity.Tuple); ok {
+				if baseTuple, ok := tVal.Elem().Interface().(cqlxoEntity.BaseScyllaTupleInterface); ok {
 					typeInfo := &gocql.TupleTypeInfo{
 						NativeType: gocql.NewNativeType(5, gocql.TypeTuple),
 					}
@@ -157,8 +157,8 @@ func convertToCqlUDT(m gocqlx.UDT) ([]gocql.UDTField, error) {
 	return udtFields, nil
 }
 
-// convertToCqlTuple - Convert from go struct type to CQL Tuple Elements type
-func convertToCqlTuple(m cqlxoEntity.Tuple) ([]gocql.TypeInfo, error) {
+// convertToCqlTuple - Convert from go struct type to CQL BaseScyllaTupleInterface Elements type
+func convertToCqlTuple(m cqlxoEntity.BaseScyllaTupleInterface) ([]gocql.TypeInfo, error) {
 	t := reflect.TypeOf(m)
 
 	var tupleFields []gocql.TypeInfo
@@ -169,8 +169,8 @@ func convertToCqlTuple(m cqlxoEntity.Tuple) ([]gocql.TypeInfo, error) {
 			continue
 		}
 
-		//ignore cqlxoEntity.Tuple field
-		if field.Type.Implements(reflect.TypeOf((*cqlxoEntity.Tuple)(nil)).Elem()) && field.Name == "Tuple" {
+		//ignore cqlxoEntity.BaseScyllaTupleInterface field
+		if field.Type.Implements(reflect.TypeOf((*cqlxoEntity.BaseScyllaTupleInterface)(nil)).Elem()) && field.Name == "BaseScyllaTupleInterface" {
 			continue
 		}
 

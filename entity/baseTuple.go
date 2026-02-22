@@ -1,5 +1,5 @@
 package cqlxoEntity
 
-type Tuple interface {
+type BaseScyllaTupleInterface interface {
 	Tuple() string
 }

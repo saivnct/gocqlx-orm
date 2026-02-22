@@ -155,7 +155,7 @@ func TestExample02(t *testing.T) {
 	}
 	AssertEqual(t, count, 1)
 
-	var carEntities []cqlxoEntity.BaseModelInterface
+	var carEntities []cqlxoEntity.BaseScyllaEntityInterface
 	for i := 2024; i < 2050; i++ {
 		car := Car{
 			Id:     gocql.TimeUUID(),

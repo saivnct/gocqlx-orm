@@ -29,7 +29,7 @@ var (
 	NotMatchTypesErr           = errors.New("go Type Not Matching CQL Type")
 )
 
-func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
+func ParseTableMetaData(m cqlxoEntity.BaseScyllaEntityInterface) (EntityInfo, error) {
 	var entityInfo EntityInfo
 
 	tableName := m.TableName()
