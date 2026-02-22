@@ -15,7 +15,7 @@ type EntityInfo struct {
 	Columns        []ColumnInfo
 	Indexes        []string
 	ColumFieldMap  map[string]string //column name => field name
-	FieldColumdMap map[string]string //field name => column name
+	FieldColumnMap map[string]string //field name => column name
 }
 
 func (e EntityInfo) GetPrimaryKey() string {
@@ -32,7 +32,7 @@ func (e EntityInfo) GetPrimaryKey() string {
 	}
 }
 
-func (e EntityInfo) GetGreateTableStatement() string {
+func (e EntityInfo) GetCreateTableStatement() string {
 	colStms := sliceUtils.Map(e.Columns, func(c ColumnInfo) string { return c.GetCqlTypeDeclareStatement() })
 	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s , PRIMARY KEY (%s))",
 		e.TableMetaData.Name,

@@ -65,6 +65,8 @@ func (d *DAO) checkAndCreateUDT() error {
 		return NoSessionError
 	}
 	udts := d.EntityInfo.ScanUDTs()
+
+	//reverse the order of udts to make sure the nested udt is created before the parent udt
 	udts = sliceUtils.Reverse(udts)
 
 	for _, udt := range udts {
@@ -82,8 +84,8 @@ func (d *DAO) checkAndCreateTable() error {
 		return NoSessionError
 	}
 
-	//log.Println(d.EntityInfo.GetGreateTableStatement())
-	err := d.Session.ExecStmt(d.EntityInfo.GetGreateTableStatement())
+	//log.Println(d.EntityInfo.GetCreateTableStatement())
+	err := d.Session.ExecStmt(d.EntityInfo.GetCreateTableStatement())
 	return err
 }
 
@@ -392,9 +394,11 @@ func (d *DAO) getQueryMap(queryEntity cqlxoEntity.BaseModelInterface, columnName
 	return queryMap
 }
 
+// Cmp if a filtering comparator that is used in WHERE and IF clauses.
 func getCmp(m qb.M) []qb.Cmp {
 	var cmps []qb.Cmp
 	for k, _ := range m {
+		// Eq produces column=?.
 		cmps = append(cmps, qb.Eq(k))
 	}
 	return cmps

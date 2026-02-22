@@ -49,7 +49,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 	var columns []ColumnInfo
 	var indexes []string
 	var columFieldMap = map[string]string{}
-	var fieldColumdMap = map[string]string{}
+	var fieldColumnMap = map[string]string{}
 
 	pKeyMap := map[int]string{}
 	cKeyMap := map[int]string{}
@@ -65,6 +65,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 
 		colName := strings.TrimSpace(field.Tag.Get("db"))
 		if colName == "-" {
+			//ignore field with db tag "-"
 			continue
 		}
 		if len(colName) == 0 {
@@ -78,6 +79,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 
 		colType := strings.TrimSpace(field.Tag.Get("dbType"))
 		if len(colType) == 0 {
+			//if dbType tag is not provided, try to convert Go type to CQL type
 			cqlType, err = convertToDefaultCqlType(field.Type)
 			if err != nil {
 				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s -> %w", ConvertToDefaultCQLTypeErr, tableName, field.Name, err)
@@ -98,6 +100,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			}
 
 		} else {
+			//if dbType tag is provided, parse the tag to get CQL type
 			frozen = strings.HasPrefix(colType, "frozen<")
 
 			cqlType, err = getCqlType(colType)
@@ -124,6 +127,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 
 			}
 
+			//validate if Go type of field is matching with CQL type
 			if !validateFieldType(field.Type, cqlType) {
 				return entityInfo, fmt.Errorf("%w -> table: %s, field: %s", NotMatchTypesErr, tableName, field.Name)
 			}
@@ -132,6 +136,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		//log.Printf("Field Name: %s,\t Field Type: %s,\t Field Value: %s\n%s\n", field.Name, field.Type, v.Field(i).Interface(), GetCqlTypeInfo(cqlType))
 		//log.Printf("(%s-%s): %s\n", field.Name, field.Type, GetCqlTypeInfo(cqlType))
 
+		//check conflict column name
 		idx := slices.IndexFunc(columns, func(c ColumnInfo) bool { return c.Name == colName })
 		if idx >= 0 {
 			return entityInfo, fmt.Errorf("%w -> table: %s, column name: %s", ConflictColumnNameErr, tableName, colName)
@@ -143,7 +148,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			Type:   cqlType,
 		})
 		columFieldMap[colName] = field.Name
-		fieldColumdMap[field.Name] = colName
+		fieldColumnMap[field.Name] = colName
 
 		index := strings.TrimSpace(field.Tag.Get("index"))
 		if index == "true" {
@@ -152,6 +157,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 
 		//log.Printf("colName: %s, field.Name: %s\n", colName, field.Name)
 
+		//parse partition key
 		pk := strings.TrimSpace(field.Tag.Get("pk"))
 		if len(pk) > 0 {
 			pkIndex, err := strconv.Atoi(pk)
@@ -167,6 +173,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 			}
 		}
 
+		//parse clustering key
 		ck := strings.TrimSpace(field.Tag.Get("ck"))
 		if len(ck) > 0 {
 			ckIndex, err := strconv.Atoi(ck)
@@ -191,6 +198,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		return entityInfo, NoPartitionKeyErr
 	}
 
+	//validate and sort partition keys
 	var pkeys []string
 	for i := 1; i <= maxPkeyIndex; i++ {
 		if pk, ok := pKeyMap[i]; ok {
@@ -200,6 +208,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		}
 	}
 
+	//validate and sort clustering keys
 	var ckeys []string
 	for i := 1; i <= maxCkeyIndex; i++ {
 		if ck, ok := cKeyMap[i]; ok {
@@ -222,7 +231,7 @@ func ParseTableMetaData(m cqlxoEntity.BaseModelInterface) (EntityInfo, error) {
 		Columns:        columns,
 		Indexes:        indexes,
 		ColumFieldMap:  columFieldMap,
-		FieldColumdMap: fieldColumdMap,
+		FieldColumnMap: fieldColumnMap,
 	}
 
 	return entityInfo, nil

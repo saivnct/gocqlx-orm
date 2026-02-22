@@ -71,7 +71,7 @@ func TestExample03(t *testing.T) {
 	AssertEqual(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.Indexes, []string{"name"}), true)
 
 	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.TableMetaData)
-	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetGreateTableStatement())
+	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetCreateTableStatement())
 
 	for _, index := range bookDAO.EntityInfo.Indexes {
 		var count int

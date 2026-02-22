@@ -155,7 +155,7 @@ func TestExample01(t *testing.T) {
 
 	udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
 	log.Printf("Person UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
-	log.Printf("Person: %s\n\n", personDAO.EntityInfo.GetGreateTableStatement())
+	log.Printf("Person: %s\n\n", personDAO.EntityInfo.GetCreateTableStatement())
 
 	for _, index := range personDAO.EntityInfo.Indexes {
 		var count int

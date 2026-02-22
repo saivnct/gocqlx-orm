@@ -133,7 +133,7 @@ func TestExample02(t *testing.T) {
 
 	//udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
 	//log.Printf("Car UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
-	//log.Printf("Car: %s\n\n", carDAO.EntityInfo.GetGreateTableStatement())
+	//log.Printf("Car: %s\n\n", carDAO.EntityInfo.GetCreateTableStatement())
 
 	for _, index := range carDAO.EntityInfo.Indexes {
 		var count int
