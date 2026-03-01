@@ -9,8 +9,8 @@ import (
 	"github.com/gocql/gocql"
 	cqlxoCodec "github.com/saivnct/gocqlx-orm/codec"
 	cqlxo_connection "github.com/saivnct/gocqlx-orm/connection"
-	cqlxoDAO "github.com/saivnct/gocqlx-orm/dao"
 	cqlxoEntity "github.com/saivnct/gocqlx-orm/entity"
+	cqlxoDAO "github.com/saivnct/gocqlx-orm/repository"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,7 +39,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 		session.Close()
 	}()
 
-	packageDAO, err := mPackageDAO(session)
+	packageRepository, err := mPackageRepository(session)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,11 +57,11 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 		"origin": "origin tuple<double, double, frozen<address>>",
 	}
 
-	assert.Equal(t, len(packageDAO.EntityInfo.Columns), len(expectedCols),
+	assert.Equal(t, len(packageRepository.EntityInfo.Columns), len(expectedCols),
 		"unexpected number of columns: got %d want %d",
-		len(packageDAO.EntityInfo.Columns), len(expectedCols))
+		len(packageRepository.EntityInfo.Columns), len(expectedCols))
 
-	for _, c := range packageDAO.EntityInfo.Columns {
+	for _, c := range packageRepository.EntityInfo.Columns {
 		want, ok := expectedCols[c.Name]
 		assert.True(t, ok, "unexpected column %q", c.Name)
 		assert.Equal(t, want, c.GetCqlTypeDeclareStatement(),
@@ -72,7 +72,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 	// -----------------------------------------------------------------------
 	// 2. Verify CREATE TABLE statement
 	// -----------------------------------------------------------------------
-	t.Logf("CREATE TABLE: %s", packageDAO.EntityInfo.GetCreateTableStatement())
+	t.Logf("CREATE TABLE: %s", packageRepository.EntityInfo.GetCreateTableStatement())
 
 	var tableCount int
 	err = session.Query(
@@ -97,7 +97,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 		"address":  "CREATE TYPE IF NOT EXISTS address (street text, city text, zip int)",
 	}
 
-	udts := packageDAO.EntityInfo.ScanUDTs()
+	udts := packageRepository.EntityInfo.ScanUDTs()
 	assert.Equal(t, len(expectedUDTStatements), len(udts),
 		"unexpected number of UDTs: got %d want %d", len(udts), len(expectedUDTStatements))
 
@@ -127,13 +127,13 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 	// -----------------------------------------------------------------------
 	// 4. Verify index creation for "name"
 	// -----------------------------------------------------------------------
-	for _, index := range packageDAO.EntityInfo.Indexes {
+	for _, index := range packageRepository.EntityInfo.Indexes {
 		var count int
-		indexName := fmt.Sprintf("%s_%s_idx", packageDAO.EntityInfo.TableMetaData.Name, index)
+		indexName := fmt.Sprintf("%s_%s_idx", packageRepository.EntityInfo.TableMetaData.Name, index)
 		t.Logf("Index: %s", indexName)
 		err = session.Query(
 			fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name = '%s'",
-				keyspace, packageDAO.EntityInfo.TableMetaData.Name, indexName),
+				keyspace, packageRepository.EntityInfo.TableMetaData.Name, indexName),
 			nil,
 		).Get(&count)
 		assert.Nil(t, err)
@@ -180,25 +180,25 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 		},
 	}
 
-	err = packageDAO.Save(pkg1)
+	err = packageRepository.Save(pkg1)
 	assert.Nil(t, err, "Save pkg1 failed")
 
-	err = packageDAO.Save(pkg2)
+	err = packageRepository.Save(pkg2)
 	assert.Nil(t, err, "Save pkg2 failed")
 
 	// CountAll
-	countAll, err := packageDAO.CountAll()
+	countAll, err := packageRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, int64(2), countAll, "expected 2 rows, got %d", countAll)
 
 	// FindAll
 	var packages []*Package
-	err = packageDAO.FindAll(&packages)
+	err = packageRepository.FindAll(&packages)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(packages), "FindAll should return 2 rows, got %d", len(packages))
 
 	// FindByPrimaryKey — pkg1
-	findWithPrimKey := func(packageDAO *PackageDAO, id gocql.UUID) (*Package, error) {
+	findWithPrimKey := func(packageDAO *PackageRepository, id gocql.UUID) (*Package, error) {
 		var results []*Package
 		err = packageDAO.FindByPrimaryKey(Package{
 			Id: id,
@@ -213,7 +213,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 		return results[0], nil
 	}
 
-	got1, err := findWithPrimKey(packageDAO, pkg1.Id)
+	got1, err := findWithPrimKey(packageRepository, pkg1.Id)
 	assert.Nil(t, err)
 	assert.NotNil(t, got1)
 	spew.Dump(got1)
@@ -241,7 +241,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 	assert.Equal(t, pkg1.Origin.Info.Zip, got1.Origin.Info.Zip, "Origin.Info.Zip mismatch")
 
 	// FindByPrimaryKey — pkg2
-	got2, err := findWithPrimKey(packageDAO, pkg2.Id)
+	got2, err := findWithPrimKey(packageRepository, pkg2.Id)
 	assert.Nil(t, err)
 	assert.NotNil(t, got1)
 	spew.Dump(got2)
@@ -263,10 +263,10 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 	assert.Equal(t, pkg2.Origin.Info.Zip, got2.Origin.Info.Zip, "Origin.Info.Zip mismatch")
 
 	// DeleteAll
-	err = packageDAO.DeleteAll()
+	err = packageRepository.DeleteAll()
 	assert.Nil(t, err)
 
-	countAll, err = packageDAO.CountAll()
+	countAll, err = packageRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, int64(0), countAll, "expected 0 rows after DeleteAll, got %d", countAll)
 }
@@ -289,7 +289,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT_insertMany(t *testing.T) {
 		session.Close()
 	}()
 
-	packageDAO, err := mPackageDAO(session)
+	packageDAO, err := mPackageRepository(session)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -331,7 +331,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT_insertMany(t *testing.T) {
 	assert.Equal(t, int64(numberOfPackages), countAll, "expected %d rows, got %d", numberOfPackages, countAll)
 
 	/////////////////////////////FIND ALL///////////////////////////////////////////
-	findAll := func(packageDAO *PackageDAO) ([]*Package, error) {
+	findAll := func(packageDAO *PackageRepository) ([]*Package, error) {
 		var results []*Package
 		err = packageDAO.FindAll(&results)
 		return results, err
@@ -358,7 +358,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT_insertMany(t *testing.T) {
 	}
 
 	/////////////////////////////FIND ALL WITH PAGINATION///////////////////////////////////////////
-	findAllWithPagination := func(packageDAO *PackageDAO, itemsPerPage int) ([]*Package, error) {
+	findAllWithPagination := func(packageDAO *PackageRepository, itemsPerPage int) ([]*Package, error) {
 		var (
 			results []*Package
 			page    []byte
@@ -419,7 +419,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT_insertMany(t *testing.T) {
 
 	////////////////////////////FIND WITH INDEX////////////////////////////////////////////
 	log.Println("Test find with INDEX")
-	findWithIndex := func(packageDAO *PackageDAO, name string) ([]*Package, error) {
+	findWithIndex := func(packageDAO *PackageRepository, name string) ([]*Package, error) {
 		var results []*Package
 		err = packageDAO.Find(Package{
 			Name: name,
@@ -448,7 +448,7 @@ func TestExample05_SliceNestedUDT_TupleOfUDT_insertMany(t *testing.T) {
 	}
 
 	////////////////////////////FIND WITH INDEX WITH PAGINATION////////////////////////////////////////////
-	findWithPagination := func(packageDAO *PackageDAO, c Package, itemsPerPage int, allowFiltering bool) ([]*Package, error) {
+	findWithPagination := func(packageDAO *PackageRepository, c Package, itemsPerPage int, allowFiltering bool) ([]*Package, error) {
 		log.Print("Find with pagination", c)
 		var (
 			results []*Package

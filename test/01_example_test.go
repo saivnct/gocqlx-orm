@@ -36,7 +36,7 @@ func TestExample01(t *testing.T) {
 	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS citizen_id (id text, end_at timestamp, created_at timestamp, level int)")
 	assert.Nil(t, err)
 
-	personDAO, err := mPersonDAO(session)
+	personRepository, err := mPersonRepository(session)
 	assert.Nil(t, err)
 
 	assetCols := map[string]string{
@@ -52,22 +52,22 @@ func TestExample01(t *testing.T) {
 		"created_at":      "created_at timestamp",
 	}
 
-	assert.Equal(t, len(personDAO.EntityInfo.Columns), len(assetCols))
+	assert.Equal(t, len(personRepository.EntityInfo.Columns), len(assetCols))
 
-	for _, column := range personDAO.EntityInfo.Columns {
+	for _, column := range personRepository.EntityInfo.Columns {
 		//log.Println(column.String())
 		//log.Printf("%s\n\n", column.GetCqlTypeDeclareStatement())
 		assert.Equal(t, assetCols[column.Name], column.GetCqlTypeDeclareStatement())
 	}
 
-	//log.Println("Person", personDAO.EntityInfo.TableMetaData)
-	assert.Equal(t, personDAO.EntityInfo.TableMetaData.Name, Person{}.TableName())
-	assert.Equal(t, len(personDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
-	assert.Equal(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.PartKey, []string{"first_name", "last_name"}), true)
-	assert.Equal(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
-	assert.Equal(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.Indexes, []string{"last_name", "first_name", "email"}), true)
+	//log.Println("Person", personRepository.EntityInfo.TableMetaData)
+	assert.Equal(t, personRepository.EntityInfo.TableMetaData.Name, Person{}.TableName())
+	assert.Equal(t, len(personRepository.EntityInfo.TableMetaData.Columns), len(assetCols))
+	assert.Equal(t, stringUtils.CompareSlicesOrdered(personRepository.EntityInfo.TableMetaData.PartKey, []string{"first_name", "last_name"}), true)
+	assert.Equal(t, stringUtils.CompareSlicesOrdered(personRepository.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
+	assert.Equal(t, stringUtils.CompareSlicesOrdered(personRepository.EntityInfo.Indexes, []string{"last_name", "first_name", "email"}), true)
 
-	log.Println("SortKey", personDAO.EntityInfo.TableMetaData.SortKey)
+	log.Println("SortKey", personRepository.EntityInfo.TableMetaData.SortKey)
 	log.Println("Check UDT")
 
 	assetUDTs := map[string]gocql.UDTTypeInfo{
@@ -118,7 +118,7 @@ func TestExample01(t *testing.T) {
 			},
 		},
 	}
-	udts := personDAO.EntityInfo.ScanUDTs()
+	udts := personRepository.EntityInfo.ScanUDTs()
 	assert.Equal(t, len(udts), len(assetUDTs))
 	for _, udt := range udts {
 		assetUdT, ok := assetUDTs[udt.Name]
@@ -142,11 +142,11 @@ func TestExample01(t *testing.T) {
 
 	udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
 	log.Printf("Person UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
-	log.Printf("Person: %s\n\n", personDAO.EntityInfo.GetCreateTableStatement())
+	log.Printf("Person: %s\n\n", personRepository.EntityInfo.GetCreateTableStatement())
 
-	for _, index := range personDAO.EntityInfo.Indexes {
+	for _, index := range personRepository.EntityInfo.Indexes {
 		var count int
-		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, personDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", personDAO.EntityInfo.TableMetaData.Name, index))
+		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, personRepository.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", personRepository.EntityInfo.TableMetaData.Name, index))
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		assert.Nil(t, err)
@@ -184,31 +184,31 @@ func TestExample01(t *testing.T) {
 			CreatedAt: time.Now(),
 		}
 
-		err = personDAO.Save(person)
+		err = personRepository.Save(person)
 		assert.Nil(t, err)
 	}
 
 	var persons []*Person
-	err = personDAO.FindAll(&persons)
+	err = personRepository.FindAll(&persons)
 	assert.Nil(t, err)
 	assert.Equal(t, len(persons), numberUsers)
 
-	countUsers, err := personDAO.CountAll()
+	countUsers, err := personRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, countUsers, int64(numberUsers))
 
 	log.Println("persons", len(persons), persons)
 
 	////////////////////////////DELETE ALL////////////////////////////////////////////
-	err = personDAO.DeleteAll()
+	err = personRepository.DeleteAll()
 	assert.Nil(t, err)
 
 	var persons2 []*Person
-	err = personDAO.FindAll(&persons2)
+	err = personRepository.FindAll(&persons2)
 	assert.Nil(t, err)
 	assert.Equal(t, len(persons2), 0)
 
-	countUsers, err = personDAO.CountAll()
+	countUsers, err = personRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, countUsers, int64(0))
 }

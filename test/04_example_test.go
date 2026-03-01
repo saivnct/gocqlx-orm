@@ -28,7 +28,7 @@ func TestExample04_NestedUDT_SliceUDT_Tuple(t *testing.T) {
 		session.Close()
 	}()
 
-	deliveryDAO, err := mDeliveryDAO(session)
+	deliveryRepository, err := mDeliveryRepository(session)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestExample04_NestedUDT_SliceUDT_Tuple(t *testing.T) {
 		"profile": "profile frozen<delivery_profile>",
 		"drop_at": "drop_at tuple<double, double>",
 	}
-	for _, c := range deliveryDAO.EntityInfo.Columns {
+	for _, c := range deliveryRepository.EntityInfo.Columns {
 		want, ok := expectedCols[c.Name]
 		assert.True(t, ok, "unexpected column %s", c.Name)
 
@@ -50,7 +50,7 @@ func TestExample04_NestedUDT_SliceUDT_Tuple(t *testing.T) {
 		"address":          "CREATE TYPE IF NOT EXISTS address (street text, city text, zip int)",
 		"delivery_profile": "CREATE TYPE IF NOT EXISTS delivery_profile (primary_address frozen<address>, address_history list<frozen<address>>)",
 	}
-	for _, udt := range deliveryDAO.EntityInfo.ScanUDTs() {
+	for _, udt := range deliveryRepository.EntityInfo.ScanUDTs() {
 		want, ok := expectedUDTStatements[udt.Name]
 		assert.True(t, ok)
 
@@ -85,15 +85,15 @@ func TestExample04_NestedUDT_SliceUDT_Tuple(t *testing.T) {
 		DropAt: Coordinate{Lat: 10.775, Lng: 106.701},
 	}
 
-	err = deliveryDAO.Save(entity)
+	err = deliveryRepository.Save(entity)
 	assert.Nil(t, err)
 
-	countAll, err := deliveryDAO.CountAll()
+	countAll, err := deliveryRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, countAll, int64(1), "expected 1 row after insert, got %d", countAll)
 
 	var deliveries []*Delivery
-	err = deliveryDAO.FindAll(&deliveries)
+	err = deliveryRepository.FindAll(&deliveries)
 	assert.Nil(t, err)
 	assert.Equal(t, len(deliveries), 1, "expected 1 row from FindAll, got %d", len(deliveries))
 	assert.Equal(t, deliveries[0].Id, entity.Id, "FindAll Id mismatch: got %s want %s", deliveries[0].Id, entity.Id)
@@ -111,7 +111,7 @@ func TestExample04_NestedUDT_SliceUDT_Tuple(t *testing.T) {
 	assert.Equal(t, deliveries[0].DropAt.Lng, entity.DropAt.Lng, "FindAll DropAt.Lng mismatch: got %s want %s", deliveries[0].DropAt.Lng, entity.DropAt.Lng)
 
 	var byPK []*Delivery
-	err = deliveryDAO.FindByPrimaryKey(Delivery{Id: entity.Id}, &byPK)
+	err = deliveryRepository.FindByPrimaryKey(Delivery{Id: entity.Id}, &byPK)
 	assert.Nil(t, err)
 	assert.Equal(t, len(byPK), 1, "expected 1 row from FindByPrimaryKey, got %d", len(byPK))
 	assert.Equal(t, byPK[0].Id, entity.Id, "FindByPrimaryKey Id mismatch: got %s want %s", byPK[0].Id, entity.Id)
@@ -137,10 +137,10 @@ func TestExample04_NestedUDT_SliceUDT_Tuple(t *testing.T) {
 	assert.Equal(t, lat, entity.DropAt.Lat, "raw query DropAt.Lat mismatch: got %f want %f", lat, entity.DropAt.Lat)
 	assert.Equal(t, lng, entity.DropAt.Lng, "raw query DropAt.Lng mismatch: got %f want %f", lng, entity.DropAt.Lng)
 
-	err = deliveryDAO.DeleteAll()
+	err = deliveryRepository.DeleteAll()
 	assert.Nil(t, err)
 
-	countAll, err = deliveryDAO.CountAll()
+	countAll, err = deliveryRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, countAll, int64(0), "expected 0 rows after delete all, got %d", countAll)
 }

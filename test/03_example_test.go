@@ -10,8 +10,8 @@ import (
 
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/connection"
-	"github.com/saivnct/gocqlx-orm/dao"
 	"github.com/saivnct/gocqlx-orm/entity"
+	"github.com/saivnct/gocqlx-orm/repository"
 	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
 	"github.com/scylladb/gocqlx/v3/qb"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,7 @@ func TestExample03(t *testing.T) {
 	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS working_document (name text, created_at timestamp)")
 	assert.Nil(t, err)
 
-	bookDAO, err := mBookDAO(session)
+	bookRepository, err := mBookRepository(session)
 	assert.Nil(t, err)
 
 	assetCols := map[string]string{
@@ -49,24 +49,24 @@ func TestExample03(t *testing.T) {
 		"created_at": "created_at timestamp",
 	}
 
-	assert.Equal(t, len(bookDAO.EntityInfo.Columns), len(assetCols))
+	assert.Equal(t, len(bookRepository.EntityInfo.Columns), len(assetCols))
 
-	for _, column := range bookDAO.EntityInfo.Columns {
+	for _, column := range bookRepository.EntityInfo.Columns {
 		assert.Equal(t, assetCols[column.Name], column.GetCqlTypeDeclareStatement())
 	}
 
-	assert.Equal(t, bookDAO.EntityInfo.TableMetaData.Name, Book{}.TableName())
-	assert.Equal(t, len(bookDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
-	assert.True(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.PartKey, []string{"author", "name"}))
-	assert.True(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}))
-	assert.True(t, stringUtils.CompareSlicesOrdered(bookDAO.EntityInfo.Indexes, []string{"name"}))
+	assert.Equal(t, bookRepository.EntityInfo.TableMetaData.Name, Book{}.TableName())
+	assert.Equal(t, len(bookRepository.EntityInfo.TableMetaData.Columns), len(assetCols))
+	assert.True(t, stringUtils.CompareSlicesOrdered(bookRepository.EntityInfo.TableMetaData.PartKey, []string{"author", "name"}))
+	assert.True(t, stringUtils.CompareSlicesOrdered(bookRepository.EntityInfo.TableMetaData.SortKey, []string{"created_at"}))
+	assert.True(t, stringUtils.CompareSlicesOrdered(bookRepository.EntityInfo.Indexes, []string{"name"}))
 
-	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.TableMetaData)
-	//log.Printf("Book: %s\n\n", bookDAO.EntityInfo.GetCreateTableStatement())
+	//log.Printf("Book: %s\n\n", bookRepository.EntityInfo.TableMetaData)
+	//log.Printf("Book: %s\n\n", bookRepository.EntityInfo.GetCreateTableStatement())
 
-	for _, index := range bookDAO.EntityInfo.Indexes {
+	for _, index := range bookRepository.EntityInfo.Indexes {
 		var count int
-		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, bookDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", bookDAO.EntityInfo.TableMetaData.Name, index))
+		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, bookRepository.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", bookRepository.EntityInfo.TableMetaData.Name, index))
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		assert.Nil(t, err)
@@ -78,7 +78,7 @@ func TestExample03(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, count, 1)
 
-	err = bookDAO.Save(Book{
+	err = bookRepository.Save(Book{
 		Id:        gocql.TimeUUID(),
 		Name:      "book 2",
 		Author:    "Kira 2",
@@ -100,37 +100,37 @@ func TestExample03(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	err = bookDAO.SaveMany(bookEntities)
+	err = bookRepository.SaveMany(bookEntities)
 	assert.Nil(t, err)
 
 	/////////////////////////////FIND ALL///////////////////////////////////////////
-	findAll := func(bookDAO *BookDAO) ([]*Book, error) {
+	findAll := func(bookDAO *BookRepository) ([]*Book, error) {
 		var books []*Book
 		err = bookDAO.FindAll(&books)
 		return books, err
 	}
 
-	books, err := findAll(bookDAO)
+	books, err := findAll(bookRepository)
 	assert.Nil(t, err)
 	assert.Equal(t, len(bookEntities)+1, len(books))
 
-	countAll, err := bookDAO.CountAll()
+	countAll, err := bookRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, int64(len(bookEntities)+1), countAll)
 
 	/////////////////////////////FIND ALL///////////////////////////////////////////
-	findAll2 := func(bookDAO *BookDAO) ([]*Book, error) {
+	findAll2 := func(bookDAO *BookRepository) ([]*Book, error) {
 		var books []*Book
 		err = bookDAO.Find(Book{}, false, &books)
 		return books, err
 	}
 
-	books, err = findAll2(bookDAO)
+	books, err = findAll2(bookRepository)
 	assert.Nil(t, err)
 	assert.Equal(t, len(bookEntities)+1, len(books))
 
 	/////////////////////////////FIND WITH PRIMARY KEY///////////////////////////////////////////
-	findWithPrimKey := func(bookDAO *BookDAO, author string, name string, createdAt time.Time) (*Book, error) {
+	findWithPrimKey := func(bookDAO *BookRepository, author string, name string, createdAt time.Time) (*Book, error) {
 		var books []*Book
 		b := Book{
 			Author: author,
@@ -158,10 +158,10 @@ func TestExample03(t *testing.T) {
 	searchBook, ok := bookEntities[randomNumber].(*Book)
 	assert.True(t, ok)
 
-	_, err = findWithPrimKey(bookDAO, searchBook.Author, searchBook.Name, zeroTime)
-	assert.True(t, errors.Is(err, cqlxoDAO.InvalidPrimaryKey))
+	_, err = findWithPrimKey(bookRepository, searchBook.Author, searchBook.Name, zeroTime)
+	assert.True(t, errors.Is(err, cqlxoRepository.InvalidPrimaryKey))
 
-	book, err := findWithPrimKey(bookDAO, searchBook.Author, searchBook.Name, searchBook.CreatedAt)
+	book, err := findWithPrimKey(bookRepository, searchBook.Author, searchBook.Name, searchBook.CreatedAt)
 	assert.Nil(t, err)
 	assert.NotNil(t, book)
 	assert.Equal(t, book.Author, searchBook.Author)
@@ -169,7 +169,7 @@ func TestExample03(t *testing.T) {
 	assert.Equal(t, book.CreatedAt.UnixMilli(), searchBook.CreatedAt.UnixMilli())
 
 	/////////////////////////////FIND WITH PARTITION KEY///////////////////////////////////////////
-	findByPartitionKey := func(bookDAO *BookDAO, author string, name string) ([]*Book, error) {
+	findByPartitionKey := func(bookDAO *BookRepository, author string, name string) ([]*Book, error) {
 		var books []*Book
 		b := Book{}
 		if author != "" {
@@ -183,10 +183,10 @@ func TestExample03(t *testing.T) {
 		return books, err
 	}
 
-	_, err = findByPartitionKey(bookDAO, "Kira", "")
-	assert.True(t, errors.Is(err, cqlxoDAO.InvalidPartitionKey))
+	_, err = findByPartitionKey(bookRepository, "Kira", "")
+	assert.True(t, errors.Is(err, cqlxoRepository.InvalidPartitionKey))
 
-	books, err = findByPartitionKey(bookDAO, "Kira", "book")
+	books, err = findByPartitionKey(bookRepository, "Kira", "book")
 	assert.Nil(t, err)
 	assert.Equal(t, len(bookEntities), len(books))
 	for _, book := range books {
@@ -195,51 +195,51 @@ func TestExample03(t *testing.T) {
 	}
 
 	////////////////////////////FIND WITH ALLOW FILTERING////////////////////////////////////////////
-	find := func(bookDAO *BookDAO, book Book, allowFiltering bool) ([]*Book, error) {
+	find := func(bookDAO *BookRepository, book Book, allowFiltering bool) ([]*Book, error) {
 		var books []*Book
 		err = bookDAO.Find(book, allowFiltering, &books)
 		return books, err
 	}
 
-	_, err = find(bookDAO, Book{
+	_, err = find(bookRepository, Book{
 		Author: "Kira",
 	}, false)
 	assert.NotNil(t, err)
 
-	books, err = find(bookDAO, Book{
+	books, err = find(bookRepository, Book{
 		Author: "Kira",
 	}, true)
 	assert.Nil(t, err)
 	assert.Equal(t, len(bookEntities), len(books))
 
 	////////////////////////////COUNT WITH ALLOW FILTERING////////////////////////////////////////////
-	countQuery, err := bookDAO.Count(Book{
+	countQuery, err := bookRepository.Count(Book{
 		Author: "Kira 2",
 	}, false)
 	assert.NotNil(t, err)
 
-	countQuery, err = bookDAO.Count(Book{
+	countQuery, err = bookRepository.Count(Book{
 		Author: "Kira 2",
 	}, true)
 	assert.Nil(t, err)
 	assert.Equal(t, int64(1), countQuery)
 
 	////////////////////////////FIND WITH INDEX////////////////////////////////////////////
-	books, err = find(bookDAO, Book{
+	books, err = find(bookRepository, Book{
 		Name: "book",
 	}, false)
 	assert.Nil(t, err)
 	assert.Equal(t, len(bookEntities), len(books))
 
 	////////////////////////////COUNT WITH INDEX////////////////////////////////////////////
-	countQuery, err = bookDAO.Count(Book{
+	countQuery, err = bookRepository.Count(Book{
 		Name: "book 2",
 	}, false)
 	assert.Nil(t, err)
 	assert.Equal(t, int64(1), countQuery)
 
 	////////////////////////////FIND WITH OK WITH PAGINATION AND SORTING WITH CK ////////////////////////////////////////////
-	findWithPagination := func(bookDAO *BookDAO, b Book, itemsPerPage int, orderBy string, order qb.Order) ([]*Book, error) {
+	findWithPagination := func(bookDAO *BookRepository, b Book, itemsPerPage int, orderBy string, order qb.Order) ([]*Book, error) {
 		log.Print("Find with pagination", b)
 		var (
 			books []*Book
@@ -248,7 +248,7 @@ func TestExample03(t *testing.T) {
 		for i := 0; ; i++ {
 			var mBooks []*Book
 
-			nextPage, err := bookDAO.FindWithOption(b, cqlxoDAO.QueryOption{
+			nextPage, err := bookDAO.FindWithOption(b, cqlxoRepository.QueryOption{
 				Page:         page,
 				ItemsPerPage: itemsPerPage,
 				OrderBy:      orderBy,
@@ -275,7 +275,7 @@ func TestExample03(t *testing.T) {
 		return books, nil
 	}
 
-	books, err = findWithPagination(bookDAO, Book{
+	books, err = findWithPagination(bookRepository, Book{
 		Name:   "book",
 		Author: "Kira",
 	}, 5, "created_at", qb.DESC)
@@ -283,35 +283,35 @@ func TestExample03(t *testing.T) {
 	assert.Equal(t, len(books), len(bookEntities))
 
 	////////////////////////////DELETE BY PRIMARY KEY////////////////////////////////////////////
-	err = bookDAO.DeleteByPrimaryKey(Book{
+	err = bookRepository.DeleteByPrimaryKey(Book{
 		Name:      "book",
 		Author:    "Kira",
 		CreatedAt: searchBook.CreatedAt,
 	})
 	assert.Nil(t, err)
 
-	book, err = findWithPrimKey(bookDAO, "Kira", "book", searchBook.CreatedAt)
+	book, err = findWithPrimKey(bookRepository, "Kira", "book", searchBook.CreatedAt)
 	assert.Nil(t, err)
 	assert.Nil(t, book)
 	////////////////////////////DELETE BY PARTITION KEY////////////////////////////////////////////
-	err = bookDAO.DeleteByPartitionKey(Book{
+	err = bookRepository.DeleteByPartitionKey(Book{
 		Name:   "book",
 		Author: "Kira",
 	})
 	assert.Nil(t, err)
 
-	books, err = findByPartitionKey(bookDAO, "Kira", "book")
+	books, err = findByPartitionKey(bookRepository, "Kira", "book")
 	assert.Nil(t, err)
 	assert.Equal(t, len(books), 0)
 
 	////////////////////////////DELETE ALL////////////////////////////////////////////
-	err = bookDAO.SaveMany(bookEntities)
+	err = bookRepository.SaveMany(bookEntities)
 	assert.Nil(t, err)
 
-	err = bookDAO.DeleteAll()
+	err = bookRepository.DeleteAll()
 	assert.Nil(t, err)
 
-	countAll, err = bookDAO.CountAll()
+	countAll, err = bookRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, int64(0), countAll)
 }

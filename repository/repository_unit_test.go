@@ -1,4 +1,4 @@
-package cqlxoDAO
+package cqlxoRepository
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ type queryEntity struct {
 func (queryEntity) TableName() string { return "query_entity" }
 
 func TestGetQueryMap_SupportsStructAndPointerAndSkipsUnknownColumns(t *testing.T) {
-	d := &DAO{
+	d := &BaseScyllaRepository{
 		EntityInfo: cqlxoCodec.EntityInfo{
 			ColumFieldMap: map[string]string{
 				"id":   "ID",
@@ -48,7 +48,7 @@ func TestGetQueryMap_SupportsStructAndPointerAndSkipsUnknownColumns(t *testing.T
 }
 
 func TestGetQueryMap_SkipsZeroValues(t *testing.T) {
-	d := &DAO{
+	d := &BaseScyllaRepository{
 		EntityInfo: cqlxoCodec.EntityInfo{
 			ColumFieldMap: map[string]string{
 				"id":  "ID",

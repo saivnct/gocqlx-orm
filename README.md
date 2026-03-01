@@ -12,7 +12,7 @@ It reduces repetitive schema and CRUD boilerplate by deriving table metadata dir
 
 - **Schema bootstrap from entities**: auto-create tables, indexes, and UDTs (`IF NOT EXISTS`)
 - **Consistent mapping**: one source of truth for Go fields, CQL columns, and key definitions
-- **Practical DAO layer**: reusable CRUD and query helpers with pagination and filtering support
+- **Practical repository layer**: reusable CRUD and query helpers with pagination and filtering support
 - **Advanced type support**: nested UDTs, collection of UDTs, and tuple columns
 
 ## Core Features
@@ -20,7 +20,7 @@ It reduces repetitive schema and CRUD boilerplate by deriving table metadata dir
 - Auto create table from model metadata
 - Auto create secondary indexes from tags
 - Auto create UDTs (including nested dependencies)
-- Base DAO for common CRUD operations:
+- Base repository for common CRUD operations:
   - `Save`, `SaveMany`
   - `FindAll`, `Find`, `FindByPrimaryKey`, `FindByPartitionKey`, `FindWithOption`
   - `CountAll`, `Count`
@@ -61,16 +61,16 @@ if err != nil {
 defer session.Close()
 ```
 
-### 3. Create a DAO
+### 3. Create a repository
 
 ```go
-type PersonDAO struct {
-    cqlxoDAO.DAO
+type PersonRepository struct {
+    cqlxoRepository.BaseScyllaRepository
 }
 
-func NewPersonDAO(session gocqlx.Session) (*PersonDAO, error) {
-    d := &PersonDAO{}
-    if err := d.InitDAO(session, Person{}); err != nil {
+func NewPersonRepository(session gocqlx.Session) (*PersonRepository, error) {
+    d := &PersonRepository{}
+    if err := d.InitRepository(session, Person{}); err != nil {
         return nil, err
     }
     return d, nil
@@ -80,12 +80,12 @@ func NewPersonDAO(session gocqlx.Session) (*PersonDAO, error) {
 ### 4. Use CRUD methods
 
 ```go
-personDAO, err := NewPersonDAO(session)
+personRepository, err := NewPersonRepository(session)
 if err != nil {
     log.Fatal(err)
 }
 
-err = personDAO.Save(Person{
+err = personRepository.Save(Person{
     ID:        gocql.TimeUUID(),
     FirstName: "Ada",
     LastName:  "Lovelace",
@@ -100,7 +100,7 @@ err = personDAO.Save(Person{
 flowchart LR
     A[Entity Struct + Tags] --> B[codec.ParseTableMetaData]
     B --> C[EntityInfo + table.Metadata]
-    C --> D[DAO.InitDAO]
+    C --> D[Repository.InitRepository]
     D --> E[Auto CREATE TYPE / TABLE / INDEX]
     D --> F[CRUD APIs]
     F --> G[gocqlx Query Builder]
@@ -164,7 +164,7 @@ func (Coordinate) Tuple() string {
 - `Page` / `ItemsPerPage`
 - `OrderBy` / `Order`
 
-Use it for page-by-page reads while preserving DAO-level mapping.
+Use it for page-by-page reads while preserving repository-level mapping.
 
 ## Examples
 
@@ -173,7 +173,8 @@ Integration examples are available under `test/`:
 - `test/01_example_test.go`
 - `test/02_example_test.go`
 - `test/03_example_test.go`
-- `test/04_example_test.go` (nested UDT, slice of UDT, tuple)
+- `test/04_example_test.go`
+- `test/05_example_test.go`
 
 ## Testing
 
@@ -215,16 +216,16 @@ If you currently use `gocqlx` directly, migration is incremental:
 
 1. Keep your existing cluster/session setup.
 2. Add entity structs with ORM tags (`db`, `pk`, `ck`, `index`, `dbType`).
-3. Create a DAO per entity embedding `cqlxoDAO.DAO`.
-4. Replace hand-written bootstrap DDL with `InitDAO(...)`.
-5. Move common CRUD queries to DAO methods (`Save`, `Find*`, `Count*`, `Delete*`).
-6. Keep complex custom CQL where needed; DAO does not block direct session usage.
+3. Create a repository per entity embedding `cqlxoRepository.BaseScyllaRepository`.
+4. Replace hand-written bootstrap DDL with `InitRepository(...)`.
+5. Move common CRUD queries to repository methods (`Save`, `Find*`, `Count*`, `Delete*`).
+6. Keep complex custom CQL where needed; repository usage does not block direct session access.
 
 Before/after pattern:
 
 ```go
 // Before (plain gocqlx): manual schema + hand-written query wiring.
-// After (gocqlx-orm): schema bootstrap + reusable DAO from entity metadata.
+// After (gocqlx-orm): schema bootstrap + reusable repository from entity metadata.
 ```
 
 ## Project Scope

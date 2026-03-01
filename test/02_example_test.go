@@ -10,8 +10,8 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/gocql/gocql"
 	"github.com/saivnct/gocqlx-orm/connection"
-	"github.com/saivnct/gocqlx-orm/dao"
 	"github.com/saivnct/gocqlx-orm/entity"
+	"github.com/saivnct/gocqlx-orm/repository"
 	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,7 +32,7 @@ func TestExample02(t *testing.T) {
 		session.Close()
 	}()
 
-	carDAO, err := mCarDAO(session)
+	carRepository, err := mCarRepository(session)
 	assert.Nil(t, err)
 
 	assetCols := map[string]string{
@@ -50,22 +50,22 @@ func TestExample02(t *testing.T) {
 		"matrix_map":    "matrix_map map<text, frozen<list<frozen<list<double>>>>>",
 	}
 
-	assert.Equal(t, len(carDAO.EntityInfo.Columns), len(assetCols))
+	assert.Equal(t, len(carRepository.EntityInfo.Columns), len(assetCols))
 
-	for _, column := range carDAO.EntityInfo.Columns {
+	for _, column := range carRepository.EntityInfo.Columns {
 		//log.Println(column.String())
 		//log.Printf("%s\n\n", column.GetCqlTypeDeclareStatement())
 		assert.Equal(t, assetCols[column.Name], column.GetCqlTypeDeclareStatement())
 	}
 
-	//log.Println("Car", carDAO.EntityInfo.TableMetaData)
-	assert.Equal(t, carDAO.EntityInfo.TableMetaData.Name, Car{}.TableName())
-	assert.Equal(t, len(carDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
-	assert.True(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.TableMetaData.PartKey, []string{"id"}))
-	assert.True(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.TableMetaData.SortKey, []string{"year"}))
-	assert.True(t, stringUtils.CompareSlicesOrdered(carDAO.EntityInfo.Indexes, []string{"brand", "model"}))
+	//log.Println("Car", carRepository.EntityInfo.TableMetaData)
+	assert.Equal(t, carRepository.EntityInfo.TableMetaData.Name, Car{}.TableName())
+	assert.Equal(t, len(carRepository.EntityInfo.TableMetaData.Columns), len(assetCols))
+	assert.True(t, stringUtils.CompareSlicesOrdered(carRepository.EntityInfo.TableMetaData.PartKey, []string{"id"}))
+	assert.True(t, stringUtils.CompareSlicesOrdered(carRepository.EntityInfo.TableMetaData.SortKey, []string{"year"}))
+	assert.True(t, stringUtils.CompareSlicesOrdered(carRepository.EntityInfo.Indexes, []string{"brand", "model"}))
 
-	//log.Println("Indexes", carDAO.EntityInfo.Indexes)
+	//log.Println("Indexes", carRepository.EntityInfo.Indexes)
 	//log.Println("Check UDT")
 
 	assetUDTs := map[string]gocql.UDTTypeInfo{
@@ -100,7 +100,7 @@ func TestExample02(t *testing.T) {
 			},
 		},
 	}
-	udts := carDAO.EntityInfo.ScanUDTs()
+	udts := carRepository.EntityInfo.ScanUDTs()
 	assert.Equal(t, len(udts), len(assetUDTs))
 	for _, udt := range udts {
 		assetUdT, ok := assetUDTs[udt.Name]
@@ -124,11 +124,11 @@ func TestExample02(t *testing.T) {
 
 	//udtStms := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return cqlxoCodec.GetCqlCreateUDTStatement(udt) })
 	//log.Printf("Car UDTs: \n%s\n\n", strings.Join(udtStms, "\n"))
-	//log.Printf("Car: %s\n\n", carDAO.EntityInfo.GetCreateTableStatement())
+	//log.Printf("Car: %s\n\n", carRepository.EntityInfo.GetCreateTableStatement())
 
-	for _, index := range carDAO.EntityInfo.Indexes {
+	for _, index := range carRepository.EntityInfo.Indexes {
 		var count int
-		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, carDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", carDAO.EntityInfo.TableMetaData.Name, index))
+		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, carRepository.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", carRepository.EntityInfo.TableMetaData.Name, index))
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
 		assert.Nil(t, err)
@@ -176,17 +176,17 @@ func TestExample02(t *testing.T) {
 
 		carEntities = append(carEntities, car)
 	}
-	err = carDAO.SaveMany(carEntities)
+	err = carRepository.SaveMany(carEntities)
 	assert.Nil(t, err)
 
 	/////////////////////////////FIND ALL///////////////////////////////////////////
-	findAll := func(carDAO *CarDAO) ([]*Car, error) {
+	findAll := func(carDAO *CarRepository) ([]*Car, error) {
 		var results []*Car
 		err = carDAO.FindAll(&results)
 		return results, err
 	}
 
-	cars, err := findAll(carDAO)
+	cars, err := findAll(carRepository)
 	assert.Nil(t, err)
 	assert.Equal(t, len(cars), len(carEntities))
 
@@ -213,7 +213,7 @@ func TestExample02(t *testing.T) {
 	}
 
 	/////////////////////////////FIND ALL WITH PAGINATION///////////////////////////////////////////
-	findAllWithPagination := func(carDAO *CarDAO, itemsPerPage int) ([]*Car, error) {
+	findAllWithPagination := func(carDAO *CarRepository, itemsPerPage int) ([]*Car, error) {
 		var (
 			cars []*Car
 			page []byte
@@ -221,7 +221,7 @@ func TestExample02(t *testing.T) {
 		for i := 0; ; i++ {
 			var mCars []*Car
 
-			nextPage, err := carDAO.FindWithOption(nil, cqlxoDAO.QueryOption{
+			nextPage, err := carDAO.FindWithOption(nil, cqlxoRepository.QueryOption{
 				Page:         page,
 				ItemsPerPage: itemsPerPage,
 			}, &mCars)
@@ -246,19 +246,19 @@ func TestExample02(t *testing.T) {
 		return cars, nil
 	}
 
-	cars, err = findAllWithPagination(carDAO, 5)
+	cars, err = findAllWithPagination(carRepository, 5)
 	assert.Nil(t, err)
 	assert.Equal(t, len(cars), len(carEntities))
 
 	///////////////////////////COUNT ALL///////////////////////////////////////////
 	log.Println("Test count all")
-	countCars, err := carDAO.CountAll()
+	countCars, err := carRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, countCars, int64(len(carEntities)))
 
 	/////////////////////////////FIND WITH PRIMARY KEY///////////////////////////////////////////
 	log.Println("Test find with primary key")
-	findWithPrimKey := func(carDAO *CarDAO, id gocql.UUID, year int) (*Car, error) {
+	findWithPrimKey := func(carDAO *CarRepository, id gocql.UUID, year int) (*Car, error) {
 		var results []*Car
 		err = carDAO.FindByPrimaryKey(Car{
 			Id:   id,
@@ -278,7 +278,7 @@ func TestExample02(t *testing.T) {
 	searchCar, ok := carEntities[randomNumber].(*Car)
 	assert.True(t, ok)
 
-	car, err := findWithPrimKey(carDAO, searchCar.Id, searchCar.Year)
+	car, err := findWithPrimKey(carRepository, searchCar.Id, searchCar.Year)
 	spew.Dump(car)
 	assert.Nil(t, err)
 	assert.NotNil(t, car)
@@ -305,7 +305,7 @@ func TestExample02(t *testing.T) {
 
 	////////////////////////////FIND WITH INDEX////////////////////////////////////////////
 	log.Println("Test find with INDEX")
-	findWithIndex := func(carDAO *CarDAO, brand string) ([]*Car, error) {
+	findWithIndex := func(carDAO *CarRepository, brand string) ([]*Car, error) {
 		var results []*Car
 		err = carDAO.Find(Car{
 			Brand: brand,
@@ -313,7 +313,7 @@ func TestExample02(t *testing.T) {
 		return results, err
 	}
 
-	cars, err = findWithIndex(carDAO, "MyBrand")
+	cars, err = findWithIndex(carRepository, "MyBrand")
 	assert.Nil(t, err)
 	assert.Equal(t, len(cars), len(carEntities))
 	for _, car := range cars {
@@ -321,7 +321,7 @@ func TestExample02(t *testing.T) {
 	}
 
 	////////////////////////////FIND WITH INDEX WITH PAGINATION////////////////////////////////////////////
-	findWithPagination := func(carDAO *CarDAO, c Car, itemsPerPage int, allowFiltering bool) ([]*Car, error) {
+	findWithPagination := func(carDAO *CarRepository, c Car, itemsPerPage int, allowFiltering bool) ([]*Car, error) {
 		log.Print("Find with pagination", c)
 		var (
 			cars []*Car
@@ -330,7 +330,7 @@ func TestExample02(t *testing.T) {
 		for i := 0; ; i++ {
 			var mCars []*Car
 
-			nextPage, err := carDAO.FindWithOption(c, cqlxoDAO.QueryOption{
+			nextPage, err := carDAO.FindWithOption(c, cqlxoRepository.QueryOption{
 				Page:           page,
 				ItemsPerPage:   itemsPerPage,
 				AllowFiltering: allowFiltering,
@@ -356,7 +356,7 @@ func TestExample02(t *testing.T) {
 		return cars, nil
 	}
 
-	cars, err = findWithPagination(carDAO, Car{
+	cars, err = findWithPagination(carRepository, Car{
 		Brand: "MyBrand",
 	}, 5, false)
 	assert.Nil(t, err)
@@ -367,12 +367,12 @@ func TestExample02(t *testing.T) {
 
 	////////////////////////////FIND WITH ALLOW FILTERING WITH PAGINATION////////////////////////////////////////////
 
-	_, err = findWithPagination(carDAO, Car{
+	_, err = findWithPagination(carRepository, Car{
 		Name: "2024",
 	}, 5, false)
 	assert.NotNil(t, err)
 
-	cars, err = findWithPagination(carDAO, Car{
+	cars, err = findWithPagination(carRepository, Car{
 		Name: "2024",
 	}, 5, true)
 	assert.Nil(t, err)
@@ -382,10 +382,10 @@ func TestExample02(t *testing.T) {
 	}
 
 	////////////////////////////DELETE ALL////////////////////////////////////////////
-	err = carDAO.DeleteAll()
+	err = carRepository.DeleteAll()
 	assert.Nil(t, err)
 
-	countCars, err = carDAO.CountAll()
+	countCars, err = carRepository.CountAll()
 	assert.Nil(t, err)
 	assert.Equal(t, countCars, int64(0))
 
