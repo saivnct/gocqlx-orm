@@ -12,24 +12,20 @@ import (
 	"github.com/saivnct/gocqlx-orm/connection"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
 	"github.com/saivnct/gocqlx-orm/utils/stringUtils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExample01(t *testing.T) {
 	keyspace := "example_01"
 
 	err := SetUpKeySpace(keyspace)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.Nil(t, err)
 
 	log.Printf("working keyspace: %s\n", keyspace)
 
 	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, keyspace, gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
-	if err != nil {
-		t.Errorf("Unable to connect to cluster")
-		return
-	}
+	assert.Nil(t, err, "Unable to connect to cluster")
+
 	session := *sessionP
 	defer func() {
 		CleanUp(session, keyspace)
@@ -38,16 +34,10 @@ func TestExample01(t *testing.T) {
 
 	//UDT type declare in entity Person but not implemented BaseUDTInterface => that means it already created in DB
 	err = session.ExecStmt("CREATE TYPE IF NOT EXISTS citizen_id (id text, end_at timestamp, created_at timestamp, level int)")
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.Nil(t, err)
 
 	personDAO, err := mPersonDAO(session)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.Nil(t, err)
 
 	assetCols := map[string]string{
 		"id":              "id timeuuid",
@@ -62,20 +52,20 @@ func TestExample01(t *testing.T) {
 		"created_at":      "created_at timestamp",
 	}
 
-	AssertEqual(t, len(personDAO.EntityInfo.Columns), len(assetCols))
+	assert.Equal(t, len(personDAO.EntityInfo.Columns), len(assetCols))
 
 	for _, column := range personDAO.EntityInfo.Columns {
 		//log.Println(column.String())
 		//log.Printf("%s\n\n", column.GetCqlTypeDeclareStatement())
-		AssertEqual(t, assetCols[column.Name], column.GetCqlTypeDeclareStatement())
+		assert.Equal(t, assetCols[column.Name], column.GetCqlTypeDeclareStatement())
 	}
 
 	//log.Println("Person", personDAO.EntityInfo.TableMetaData)
-	AssertEqual(t, personDAO.EntityInfo.TableMetaData.Name, Person{}.TableName())
-	AssertEqual(t, len(personDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
-	AssertEqual(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.PartKey, []string{"first_name", "last_name"}), true)
-	AssertEqual(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
-	AssertEqual(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.Indexes, []string{"last_name", "first_name", "email"}), true)
+	assert.Equal(t, personDAO.EntityInfo.TableMetaData.Name, Person{}.TableName())
+	assert.Equal(t, len(personDAO.EntityInfo.TableMetaData.Columns), len(assetCols))
+	assert.Equal(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.PartKey, []string{"first_name", "last_name"}), true)
+	assert.Equal(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.TableMetaData.SortKey, []string{"created_at"}), true)
+	assert.Equal(t, stringUtils.CompareSlicesOrdered(personDAO.EntityInfo.Indexes, []string{"last_name", "first_name", "email"}), true)
 
 	log.Println("SortKey", personDAO.EntityInfo.TableMetaData.SortKey)
 	log.Println("Check UDT")
@@ -129,26 +119,23 @@ func TestExample01(t *testing.T) {
 		},
 	}
 	udts := personDAO.EntityInfo.ScanUDTs()
-	//AssertEqual(t, len(udts), len(assetUDTs))
+	assert.Equal(t, len(udts), len(assetUDTs))
 	for _, udt := range udts {
 		assetUdT, ok := assetUDTs[udt.Name]
-		AssertEqual(t, ok, true)
+		assert.True(t, ok)
 		log.Println(udt.Name)
 
-		AssertEqual(t, assetUdT.Name, udt.Name)
-		AssertEqual(t, len(assetUdT.Elements), len(udt.Elements))
+		assert.Equal(t, assetUdT.Name, udt.Name)
+		assert.Equal(t, len(assetUdT.Elements), len(udt.Elements))
 		for i, element := range udt.Elements {
-			AssertEqual(t, assetUdT.Elements[i].Name, element.Name)
-			AssertEqual(t, assetUdT.Elements[i].Type.Type().String(), element.Type.Type().String())
+			assert.Equal(t, assetUdT.Elements[i].Name, element.Name)
+			assert.Equal(t, assetUdT.Elements[i].Type.Type().String(), element.Type.Type().String())
 		}
 
 		var count int
 		err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.types WHERE keyspace_name = '%s' AND type_name = '%s'", keyspace, udt.Name), nil).Get(&count)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		AssertEqual(t, count, 1)
+		assert.Nil(t, err)
+		assert.Equal(t, count, 1)
 	}
 	udtNames := sliceUtils.Map(udts, func(udt gocql.UDTTypeInfo) string { return udt.Name })
 	log.Printf("Person UDTs: %s\n\n", strings.Join(udtNames, ", "))
@@ -162,64 +149,66 @@ func TestExample01(t *testing.T) {
 		str := fmt.Sprintf("SELECT COUNT(*) FROM system_schema.indexes WHERE keyspace_name = '%s' AND table_name = '%s' AND index_name ='%s' ", keyspace, personDAO.EntityInfo.TableMetaData.Name, fmt.Sprintf("%s_%s_idx", personDAO.EntityInfo.TableMetaData.Name, index))
 		//log.Println(str)
 		err = session.Query(str, nil).Get(&count)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		AssertEqual(t, count, 1)
+		assert.Nil(t, err)
+		assert.Equal(t, count, 1)
 	}
 
 	var count int
 	err = session.Query(fmt.Sprintf("SELECT COUNT(*) FROM system_schema.tables WHERE keyspace_name = '%s' AND table_name = '%s'", keyspace, Person{}.TableName()), nil).Get(&count)
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	AssertEqual(t, count, 1)
+	assert.Nil(t, err)
+	assert.Equal(t, count, 1)
 
-	person := Person{
-		Id:        gocql.TimeUUID(),
-		LastName:  "test",
-		FirstName: "test2",
-		FavoritePlace: FavoritePlace{
-			City:       "HCM",
-			Country:    "VN",
-			Population: 0,
-			CheckPoint: []string{"1", "2", "3"},
-			Rating:     3,
-		},
-		Email:          "test@test.com",
-		StaticIP:       "127.0.0.1",
-		Nicknames:      []string{"test", "test2", "test3"},
-		WorkingHistory: map[int]string{1: "test", 2: "test2", 3: "test3"},
-		CitizenIdent: CitizenIdent{
-			Id:        gocql.TimeUUID().String(),
-			EndAt:     time.Time{},
-			CreatedAt: time.Time{},
-			Level:     10,
-		},
-		CreatedAt: time.Now(),
-	}
+	numberUsers := 10
+	for i := 0; i < numberUsers; i++ {
+		person := &Person{
+			Id:        gocql.TimeUUID(),
+			LastName:  fmt.Sprintf("last_name_%d", i),
+			FirstName: fmt.Sprintf("first_name_%d", i),
+			FavoritePlace: FavoritePlace{
+				City:       "HCM",
+				Country:    "VN",
+				Population: 0,
+				CheckPoint: []string{"1", "2", "3"},
+				Rating:     3,
+			},
+			Email:          fmt.Sprintf("test%d@mail.com", i),
+			StaticIP:       "127.0.0.1",
+			Nicknames:      []string{"test", "test2", "test3"},
+			WorkingHistory: map[int]string{1: "test", 2: "test2", 3: "test3"},
+			CitizenIdent: CitizenIdent{
+				Id:        gocql.TimeUUID().String(),
+				EndAt:     time.Time{},
+				CreatedAt: time.Time{},
+				Level:     10,
+			},
+			CreatedAt: time.Now(),
+		}
 
-	err = personDAO.Save(person)
-	if err != nil {
-		t.Errorf("Unable to save person -> %v", err)
-		return
+		err = personDAO.Save(person)
+		assert.Nil(t, err)
 	}
 
-	var persons []Person
+	var persons []*Person
 	err = personDAO.FindAll(&persons)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.Nil(t, err)
+	assert.Equal(t, len(persons), numberUsers)
 
-	log.Println("persons", persons)
+	countUsers, err := personDAO.CountAll()
+	assert.Nil(t, err)
+	assert.Equal(t, countUsers, int64(numberUsers))
+
+	log.Println("persons", len(persons), persons)
 
 	////////////////////////////DELETE ALL////////////////////////////////////////////
 	err = personDAO.DeleteAll()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.Nil(t, err)
+
+	var persons2 []*Person
+	err = personDAO.FindAll(&persons2)
+	assert.Nil(t, err)
+	assert.Equal(t, len(persons2), 0)
+
+	countUsers, err = personDAO.CountAll()
+	assert.Nil(t, err)
+	assert.Equal(t, countUsers, int64(0))
 }

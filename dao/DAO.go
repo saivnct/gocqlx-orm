@@ -10,6 +10,7 @@ import (
 	"github.com/saivnct/gocqlx-orm/codec"
 	"github.com/saivnct/gocqlx-orm/entity"
 	"github.com/saivnct/gocqlx-orm/utils/sliceUtils"
+	"github.com/scylladb/go-reflectx"
 	"github.com/scylladb/gocqlx/v3"
 	"github.com/scylladb/gocqlx/v3/qb"
 )
@@ -116,7 +117,10 @@ func (d *DAO) Save(entity cqlxoEntity.BaseScyllaEntityInterface) error {
 		if err != nil {
 			return err
 		}
-		return d.Session.Session.Query(stmt, args...).Exec()
+
+		q := d.Session.Session.Query(stmt, args...)
+		defer q.Release()
+		return q.Exec()
 	}
 
 	q := d.Session.Query(d.EntityInfo.Table.Insert()).BindStruct(entity)
@@ -131,12 +135,20 @@ func (d *DAO) SaveMany(entities []cqlxoEntity.BaseScyllaEntityInterface) error {
 
 	if d.hasTupleColumn() {
 		stmt := d.getInsertStmt()
+		var q *gocql.Query
+		defer func() {
+			if q != nil {
+				q.Release()
+			}
+		}()
+
 		for _, entity := range entities {
 			args, err := d.getInsertArgs(entity)
 			if err != nil {
 				return err
 			}
-			if err = d.Session.Session.Query(stmt, args...).Exec(); err != nil {
+			q = d.Session.Session.Query(stmt, args...)
+			if err = q.Exec(); err != nil {
 				return err
 			}
 		}
@@ -144,13 +156,17 @@ func (d *DAO) SaveMany(entities []cqlxoEntity.BaseScyllaEntityInterface) error {
 	}
 
 	q := d.EntityInfo.Table.InsertQuery(d.Session)
+	defer func() {
+		if q != nil {
+			q.Release()
+		}
+	}()
 	for _, entity := range entities {
 		q.BindStruct(entity)
 		if err := q.Exec(); err != nil {
 			return err
 		}
 	}
-	q.Release()
 	return nil
 }
 
@@ -208,15 +224,15 @@ func (d *DAO) getInsertArgs(entity cqlxoEntity.BaseScyllaEntityInterface) ([]int
 
 		colInfo, ok := d.getColumnInfo(colName)
 		if !ok || colInfo.Type.Type() != gocql.TypeTuple {
-			args = append(args, fieldValue.Interface())
+			args = append(args, cqlxoCodec.WrapValueForWrite(colInfo.Type, fieldValue, d.mapper()))
 			continue
 		}
 
-		tupleElems, err := tupleStructToArgs(fieldValue)
+		tupleType := colInfo.Type.(gocql.TupleTypeInfo)
+		tupleElems, err := cqlxoCodec.TupleStructToArgs(fieldValue, tupleType, d.mapper())
 		if err != nil {
 			return nil, fmt.Errorf("tuple column %s: %w", colName, err)
 		}
-		tupleType := colInfo.Type.(gocql.TupleTypeInfo)
 		if len(tupleElems) != len(tupleType.Elems) {
 			return nil, fmt.Errorf("tuple column %s: expected %d fields, got %d", colName, len(tupleType.Elems), len(tupleElems))
 		}
@@ -232,29 +248,6 @@ func (d *DAO) getColumnInfo(colName string) (cqlxoCodec.ColumnInfo, bool) {
 		}
 	}
 	return cqlxoCodec.ColumnInfo{}, false
-}
-
-func tupleStructToArgs(v reflect.Value) ([]interface{}, error) {
-	for v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return nil, errors.New("tuple value is nil")
-		}
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return nil, errors.New("tuple value must be a struct")
-	}
-
-	var elems []interface{}
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		if field.PkgPath != "" {
-			continue
-		}
-		elems = append(elems, v.Field(i).Interface())
-	}
-	return elems, nil
 }
 
 func (d *DAO) selectRelease(q *gocqlx.Queryx, result interface{}) error {
@@ -279,16 +272,29 @@ func (d *DAO) scanTupleIter(iter *gocqlx.Iterx, result interface{}) error {
 	elemType := sliceVal.Type().Elem()
 	scanner := iter.Scanner()
 
+	// isPtr is true when the slice holds pointers, e.g. []*Package
+	isPtr := elemType.Kind() == reflect.Ptr
+	structType := elemType
+	for structType.Kind() == reflect.Ptr {
+		structType = structType.Elem()
+	}
+
 	for scanner.Next() {
-		elem := reflect.New(elemType).Elem()
-		dest, err := d.buildTupleScanDest(elem)
+		// Always allocate a concrete struct for scanning
+		structPtr := reflect.New(structType) // e.g. *Package
+		dest, err := d.buildTupleScanDest(structPtr.Elem())
 		if err != nil {
 			return err
 		}
 		if err = scanner.Scan(dest...); err != nil {
 			return err
 		}
-		sliceVal = reflect.Append(sliceVal, elem)
+		// Append the right type (pointer or value) back to the slice
+		if isPtr {
+			sliceVal = reflect.Append(sliceVal, structPtr)
+		} else {
+			sliceVal = reflect.Append(sliceVal, structPtr.Elem())
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
@@ -315,44 +321,16 @@ func (d *DAO) buildTupleScanDest(row reflect.Value) ([]interface{}, error) {
 
 		colInfo, ok := d.getColumnInfo(colName)
 		if !ok || colInfo.Type.Type() != gocql.TypeTuple {
-			dest = append(dest, fieldVal.Addr().Interface())
+			dest = append(dest, cqlxoCodec.WrapDestForRead(colInfo.Type, fieldVal, d.mapper()))
 			continue
 		}
 
 		tupleType := colInfo.Type.(gocql.TupleTypeInfo)
-		tupleDest, err := tupleFieldPointers(fieldVal, len(tupleType.Elems))
+		tupleDest, err := cqlxoCodec.TupleFieldPointers(fieldVal, tupleType, d.mapper())
 		if err != nil {
 			return nil, fmt.Errorf("tuple column %s: %w", colName, err)
 		}
 		dest = append(dest, tupleDest...)
-	}
-
-	return dest, nil
-}
-
-func tupleFieldPointers(v reflect.Value, expected int) ([]interface{}, error) {
-	for v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			v.Set(reflect.New(v.Type().Elem()))
-		}
-		v = v.Elem()
-	}
-	if v.Kind() != reflect.Struct {
-		return nil, errors.New("tuple destination must be a struct")
-	}
-
-	var dest []interface{}
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		if field.PkgPath != "" {
-			continue
-		}
-		dest = append(dest, v.Field(i).Addr().Interface())
-	}
-
-	if len(dest) != expected {
-		return nil, fmt.Errorf("expected %d tuple fields, got %d", expected, len(dest))
 	}
 
 	return dest, nil
@@ -365,6 +343,13 @@ func (d *DAO) FindAll(result interface{}) error {
 
 	q := qb.Select(d.EntityInfo.TableMetaData.Name).Columns(d.EntityInfo.TableMetaData.Columns...).Query(d.Session)
 	return d.selectRelease(q, result)
+}
+
+func (d *DAO) mapper() *reflectx.Mapper {
+	if d.Session.Mapper != nil {
+		return d.Session.Mapper
+	}
+	return gocqlx.DefaultMapper
 }
 
 func (d *DAO) FindByPrimaryKey(queryEntity cqlxoEntity.BaseScyllaEntityInterface, result interface{}) error {

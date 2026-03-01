@@ -79,9 +79,3 @@ func SetUpKeySpace(keyspace string) error {
 func CleanUp(session gocqlx.Session, keyspace string) {
 	session.ExecStmt(fmt.Sprintf("DROP KEYSPACE %s", keyspace))
 }
-
-func AssertEqual(t *testing.T, x, y interface{}) {
-	if x != y {
-		t.Error("Expected ", y, ", got ", x)
-	}
-}
