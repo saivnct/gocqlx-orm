@@ -1,9 +1,11 @@
 package cqlxoRepository
 
 import (
+	"errors"
 	"testing"
 
 	cqlxoCodec "github.com/saivnct/gocqlx-orm/codec"
+	"github.com/scylladb/gocqlx/v3/table"
 )
 
 type queryEntity struct {
@@ -63,5 +65,40 @@ func TestGetQueryMap_SkipsZeroValues(t *testing.T) {
 	}
 	if result["id"] != "1" {
 		t.Fatalf("expected id=1, got %v", result["id"])
+	}
+}
+
+func TestSaveWithTTL_RejectsInvalidTTL(t *testing.T) {
+	d := &BaseScyllaRepository{}
+
+	err := d.SaveWithTTL(queryEntity{}, 0)
+	if !errors.Is(err, InvalidTTL) {
+		t.Fatalf("expected InvalidTTL, got %v", err)
+	}
+}
+
+func TestSaveManyWithTTL_RejectsInvalidTTL(t *testing.T) {
+	d := &BaseScyllaRepository{}
+
+	err := d.SaveManyWithTTL(nil, -1)
+	if !errors.Is(err, InvalidTTL) {
+		t.Fatalf("expected InvalidTTL, got %v", err)
+	}
+}
+
+func TestGetInsertStmtWithTTL_AppendsUsingTTL(t *testing.T) {
+	d := &BaseScyllaRepository{
+		EntityInfo: cqlxoCodec.EntityInfo{
+			TableMetaData: table.Metadata{
+				Name:    "test_entity",
+				Columns: []string{"id", "name"},
+			},
+		},
+	}
+
+	stmt := d.getInsertStmtWithTTL()
+	expected := "INSERT INTO test_entity (id, name) VALUES (?, ?) USING TTL ?"
+	if stmt != expected {
+		t.Fatalf("unexpected statement:\n got: %s\nwant: %s", stmt, expected)
 	}
 }

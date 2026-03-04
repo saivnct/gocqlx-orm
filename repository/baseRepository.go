@@ -20,6 +20,7 @@ var (
 	NoQueryEntityError  = errors.New("no Query Entity")
 	InvalidPrimaryKey   = errors.New("invalid PrimaryKey")
 	InvalidPartitionKey = errors.New("invalid PartitionKey")
+	InvalidTTL          = errors.New("invalid TTL")
 )
 
 type BaseScyllaRepository struct {
@@ -128,6 +129,31 @@ func (d *BaseScyllaRepository) Save(entity cqlxoEntity.BaseScyllaEntityInterface
 	return q.ExecRelease()
 }
 
+// SaveWithTTL inserts one entity with a per-row TTL.
+//
+// The ttl parameter is expressed in seconds (CQL USING TTL unit), for example:
+//   - ttl=60   -> expires in 1 minute
+//   - ttl=3600 -> expires in 1 hour
+func (d *BaseScyllaRepository) SaveWithTTL(entity cqlxoEntity.BaseScyllaEntityInterface, ttl int64) error {
+	if ttl <= 0 {
+		return InvalidTTL
+	}
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	stmt := d.getInsertStmtWithTTL()
+	args, err := d.getInsertArgs(entity)
+	if err != nil {
+		return err
+	}
+	args = append(args, ttl)
+
+	q := d.Session.Session.Query(stmt, args...)
+	defer q.Release()
+	return q.Exec()
+}
+
 func (d *BaseScyllaRepository) SaveMany(entities []cqlxoEntity.BaseScyllaEntityInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
@@ -170,6 +196,41 @@ func (d *BaseScyllaRepository) SaveMany(entities []cqlxoEntity.BaseScyllaEntityI
 	return nil
 }
 
+// SaveManyWithTTL inserts multiple entities with the same per-row TTL.
+//
+// The ttl parameter is expressed in seconds (CQL USING TTL unit), for example:
+//   - ttl=60   -> expires in 1 minute
+//   - ttl=3600 -> expires in 1 hour
+func (d *BaseScyllaRepository) SaveManyWithTTL(entities []cqlxoEntity.BaseScyllaEntityInterface, ttl int64) error {
+	if ttl <= 0 {
+		return InvalidTTL
+	}
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+
+	stmt := d.getInsertStmtWithTTL()
+	var q *gocql.Query
+	defer func() {
+		if q != nil {
+			q.Release()
+		}
+	}()
+
+	for _, entity := range entities {
+		args, err := d.getInsertArgs(entity)
+		if err != nil {
+			return err
+		}
+		args = append(args, ttl)
+		q = d.Session.Session.Query(stmt, args...)
+		if err = q.Exec(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (d *BaseScyllaRepository) hasTupleColumn() bool {
 	for _, column := range d.EntityInfo.Columns {
 		if column.Type.Type() == gocql.TypeTuple {
@@ -206,6 +267,10 @@ func (d *BaseScyllaRepository) getInsertStmt() string {
 		strings.Join(columns, ", "),
 		strings.Join(placeholders, ", "),
 	)
+}
+
+func (d *BaseScyllaRepository) getInsertStmtWithTTL() string {
+	return fmt.Sprintf("%s USING TTL ?", d.getInsertStmt())
 }
 
 func (d *BaseScyllaRepository) getInsertArgs(entity cqlxoEntity.BaseScyllaEntityInterface) ([]interface{}, error) {

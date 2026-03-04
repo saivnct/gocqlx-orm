@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gocql/gocql"
 	cqlxo_connection "github.com/saivnct/gocqlx-orm/connection"
+	cqlxoEntity "github.com/saivnct/gocqlx-orm/entity"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -107,4 +109,76 @@ func TestExample06_ByteArrayField(t *testing.T) {
 	countAll, err = repo.CountAll()
 	assert.NoError(t, err)
 	assert.Equal(t, int64(0), countAll)
+}
+
+func TestExample06_SaveWithTTL_SaveManyWithTTL(t *testing.T) {
+	keyspace := "example_06_ttl"
+
+	err := SetUpKeySpace(keyspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, keyspace, gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := *sessionP
+	defer func() {
+		CleanUp(session, keyspace)
+		session.Close()
+	}()
+
+	repo, err := mBinaryDocumentRepository(session)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	doc1 := BinaryDocument{
+		ID:       gocql.TimeUUID(),
+		Name:     "ttl-single",
+		Payload:  []byte("will-expire"),
+		Checksum: []byte{1, 2, 3},
+	}
+	doc2 := BinaryDocument{
+		ID:       gocql.TimeUUID(),
+		Name:     "ttl-many-1",
+		Payload:  []byte{7, 8, 9},
+		Checksum: []byte{10, 11},
+	}
+	doc3 := BinaryDocument{
+		ID:       gocql.TimeUUID(),
+		Name:     "ttl-many-2",
+		Payload:  []byte{20, 21, 22},
+		Checksum: []byte{30, 31},
+	}
+
+	var ttlSingle int64 = 3 // seconds
+	var ttlMany int64 = 5   // seconds
+	err = repo.SaveWithTTL(doc1, ttlSingle)
+	assert.NoError(t, err)
+
+	err = repo.SaveManyWithTTL([]cqlxoEntity.BaseScyllaEntityInterface{doc2, doc3}, ttlMany)
+	assert.NoError(t, err)
+
+	var ttlValue int64
+	err = session.Session.Query("SELECT TTL(payload) FROM binary_document WHERE id = ?", doc1.ID).Scan(&ttlValue)
+	assert.NoError(t, err)
+	assert.Equal(t, ttlValue, ttlSingle)
+	t.Logf("doc1 ttl: %d", ttlValue)
+
+	err = session.Session.Query("SELECT TTL(payload) FROM binary_document WHERE id = ?", doc2.ID).Scan(&ttlValue)
+	assert.NoError(t, err)
+	assert.Equal(t, ttlValue, ttlMany)
+	t.Logf("doc2 ttl: %d", ttlValue)
+
+	err = session.Session.Query("SELECT TTL(payload) FROM binary_document WHERE id = ?", doc3.ID).Scan(&ttlValue)
+	assert.NoError(t, err)
+	assert.Equal(t, ttlValue, ttlMany)
+	t.Logf("doc3 ttl: %d", ttlValue)
+
+	assert.Eventually(t, func() bool {
+		countAll, e := repo.CountAll()
+		return e == nil && countAll == 0
+	}, 10*time.Second, 500*time.Millisecond, "expected all TTL rows to expire")
 }

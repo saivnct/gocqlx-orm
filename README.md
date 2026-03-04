@@ -22,6 +22,7 @@ It reduces repetitive schema and CRUD boilerplate by deriving table metadata dir
 - Auto create UDTs (including nested dependencies)
 - Base repository for common CRUD operations:
   - `Save`, `SaveMany`
+  - `SaveWithTTL`, `SaveManyWithTTL`
   - `FindAll`, `Find`, `FindByPrimaryKey`, `FindByPartitionKey`, `FindWithOption`
   - `CountAll`, `Count`
   - `DeleteAll`, `DeleteByPrimaryKey`, `DeleteByPartitionKey`
@@ -94,6 +95,25 @@ err = personRepository.Save(Person{
 })
 ```
 
+### 5. Save with TTL (expiration)
+
+TTL values are in **seconds** (CQL `USING TTL` unit):
+
+```go
+// expires after 1 hour
+err = personRepository.SaveWithTTL(person, 3600)
+
+// expires after 10 minutes
+err = personRepository.SaveManyWithTTL([]cqlxoEntity.BaseScyllaEntityInterface{
+    person1, person2,
+}, 600)
+```
+
+TTL validation behavior:
+
+- `ttl <= 0` returns `cqlxoRepository.InvalidTTL`
+- TTL is applied per written row using `INSERT ... USING TTL ?`
+
 ## Architecture
 
 ```mermaid
@@ -125,6 +145,7 @@ In addition to primitive and collection types, the library supports:
 - **Nested UDT fields**
 - **Collections of UDTs** (for example, `[]MyUDT`)
 - **Tuple columns**
+- **Byte array/blob columns** (for example, `[]byte`)
 
 ### UDT Example
 
@@ -175,6 +196,7 @@ Integration examples are available under `test/`:
 - `test/03_example_test.go`
 - `test/04_example_test.go`
 - `test/05_example_test.go`
+- `test/06_example_test.go` (byte array / blob + TTL)
 
 ## Testing
 
@@ -205,7 +227,7 @@ go test ./... -run '^$' -bench . -benchmem
 Recommended benchmark dimensions:
 
 - single-row insert/read latency (`Save`, `FindByPrimaryKey`)
-- bulk insert throughput (`SaveMany`)
+- bulk insert throughput (`SaveMany`, `SaveManyWithTTL`)
 - paginated read latency (`FindWithOption`)
 - impact of indexed vs non-indexed predicates
 - impact of nested UDT / tuple payload size
