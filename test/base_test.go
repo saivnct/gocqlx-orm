@@ -64,7 +64,7 @@ func CloseTestEnv() {
 }
 
 func SetUpKeySpace(keyspace string) error {
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "", gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "cassandra", "", "", gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
 	if err != nil {
 		return err
 	}

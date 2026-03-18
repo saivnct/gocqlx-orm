@@ -1,6 +1,7 @@
 package cqlxo_connection
 
 import (
+	"log"
 	"time"
 
 	"github.com/scylladb/gocqlx/v3"
@@ -8,7 +9,7 @@ import (
 	"github.com/gocql/gocql"
 )
 
-func CreateCluster(hosts []string, keyspace string, consistencyLevel gocql.Consistency, localDC string, clusterTimeout int, numRetries int) (*gocql.ClusterConfig, *gocqlx.Session, error) {
+func CreateCluster(hosts []string, username string, password string, keyspace string, consistencyLevel gocql.Consistency, localDC string, clusterTimeout int, numRetries int) (*gocql.ClusterConfig, *gocqlx.Session, error) {
 	retryPolicy := &gocql.ExponentialBackoffRetryPolicy{
 		Min:        time.Second,
 		Max:        10 * time.Second,
@@ -28,6 +29,14 @@ func CreateCluster(hosts []string, keyspace string, consistencyLevel gocql.Consi
 		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.DCAwareRoundRobinPolicy(localDC))
 	} else {
 		cluster.PoolConfig.HostSelectionPolicy = gocql.TokenAwareHostPolicy(gocql.RoundRobinHostPolicy())
+	}
+
+	if len(username) > 0 {
+		log.Println("Create cluster with authentication")
+		cluster.Authenticator = gocql.PasswordAuthenticator{
+			Username: username,
+			Password: password,
+		}
 	}
 
 	session, err := gocqlx.WrapSession(cluster.CreateSession())
