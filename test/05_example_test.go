@@ -29,7 +29,17 @@ func TestExample05_SliceNestedUDT_TupleOfUDT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "cassandra", "", keyspace, gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(
+		hosts,
+		"cassandra",
+		"",
+		keyspace,
+		gocql.ParseConsistency(consistencyLV),
+		gocql.ParseConsistency(serialConsistencyLV),
+		localDC,
+		clusterTimeout,
+		numRetries,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +289,17 @@ func TestExample05_SliceNestedUDT_TupleOfUDT_insertMany(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "cassandra", "", keyspace, gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(
+		hosts,
+		"cassandra",
+		"",
+		keyspace,
+		gocql.ParseConsistency(consistencyLV),
+		gocql.ParseConsistency(serialConsistencyLV),
+		localDC,
+		clusterTimeout,
+		numRetries,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,7 +25,17 @@ func TestExample03(t *testing.T) {
 
 	log.Printf("working keyspace: %s\n", keyspace)
 
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "cassandra", "", keyspace, gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(
+		hosts,
+		"cassandra",
+		"",
+		keyspace,
+		gocql.ParseConsistency(consistencyLV),
+		gocql.ParseConsistency(serialConsistencyLV),
+		localDC,
+		clusterTimeout,
+		numRetries,
+	)
 	assert.Nil(t, err)
 
 	session := *sessionP

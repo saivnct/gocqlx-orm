@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	hosts          = []string{"localhost"}
-	clusterTimeout = 10
-	numRetries     = 5
-	localDC        = ""
-	consistencyLV  = "LOCAL_ONE"
+	hosts               = []string{"localhost"}
+	clusterTimeout      = 10
+	numRetries          = 5
+	localDC             = ""
+	consistencyLV       = "LOCAL_QUORUM"
+	serialConsistencyLV = "LOCAL_SERIAL"
 )
 
 func TestMain(m *testing.M) {
@@ -64,7 +65,17 @@ func CloseTestEnv() {
 }
 
 func SetUpKeySpace(keyspace string) error {
-	_, sessionP, err := cqlxo_connection.CreateCluster(hosts, "cassandra", "", "", gocql.ParseConsistency(consistencyLV), localDC, clusterTimeout, numRetries)
+	_, sessionP, err := cqlxo_connection.CreateCluster(
+		hosts,
+		"cassandra",
+		"",
+		"",
+		gocql.ParseConsistency(consistencyLV),
+		gocql.ParseConsistency(serialConsistencyLV),
+		localDC,
+		clusterTimeout,
+		numRetries,
+	)
 	if err != nil {
 		return err
 	}
