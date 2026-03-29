@@ -114,6 +114,47 @@ TTL validation behavior:
 - `ttl <= 0` returns `cqlxoRepository.InvalidTTL`
 - TTL is applied per written row using `INSERT ... USING TTL ?`
 
+### 6. Configure Batch Save Behavior
+
+`SaveMany` and `SaveManyWithTTL` use CQL batch execution with safe defaults:
+
+- default chunk size: `50`
+- default batch type: `gocql.UnloggedBatch`
+
+You can override this per repository:
+
+```go
+personRepository.SetBatchSaveConfig(cqlxoRepository.BatchSaveConfig{
+    ChunkSize: 100,
+    Type:      gocql.LoggedBatch,
+})
+```
+
+Fallback rules:
+
+- `ChunkSize <= 0` falls back to `50`
+- unsupported batch type falls back to `gocql.UnloggedBatch`
+
+#### Batch Type Selection Guide
+
+`BatchSaveConfig.Type` accepts:
+
+- `gocql.UnloggedBatch` (default)
+- `gocql.LoggedBatch`
+- `gocql.CounterBatch`
+
+Choose batch type based on your write pattern:
+
+- `gocql.UnloggedBatch`: best default for most `SaveMany` workloads where rows are independent. Lower coordinator overhead than logged batches.
+- `gocql.LoggedBatch`: use when you need atomicity across multiple statements in the same batch (all-or-nothing semantics). This has higher overhead.
+- `gocql.CounterBatch`: use only for counter table updates.
+
+Practical guidance:
+
+- Prefer small chunk sizes even with batches; very large batches can hurt performance.
+- For ordinary bulk insert/update of non-counter data, start with `UnloggedBatch`.
+- Switch to `LoggedBatch` only when atomic multi-statement behavior is required.
+
 ## Architecture
 
 ```mermaid

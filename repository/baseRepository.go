@@ -26,6 +26,18 @@ var (
 type BaseScyllaRepository struct {
 	EntityInfo cqlxoCodec.EntityInfo
 	Session    gocqlx.Session
+
+	BatchConfig *BatchSaveConfig
+}
+
+const (
+	defaultBatchChunkSize = 50
+	defaultBatchType      = gocql.UnloggedBatch
+)
+
+type BatchSaveConfig struct {
+	ChunkSize int
+	Type      gocql.BatchType
 }
 
 type QueryOption struct {
@@ -34,6 +46,10 @@ type QueryOption struct {
 	ItemsPerPage   int
 	OrderBy        string
 	Order          qb.Order
+}
+
+func (d *BaseScyllaRepository) SetBatchSaveConfig(config BatchSaveConfig) {
+	d.BatchConfig = &config
 }
 
 func (d *BaseScyllaRepository) InitRepository(session gocqlx.Session, m cqlxoEntity.BaseScyllaEntityInterface) error {
@@ -159,41 +175,7 @@ func (d *BaseScyllaRepository) SaveMany(entities []cqlxoEntity.BaseScyllaEntityI
 		return NoSessionError
 	}
 
-	if d.hasTupleColumn() {
-		stmt := d.getInsertStmt()
-		var q *gocql.Query
-		defer func() {
-			if q != nil {
-				q.Release()
-			}
-		}()
-
-		for _, entity := range entities {
-			args, err := d.getInsertArgs(entity)
-			if err != nil {
-				return err
-			}
-			q = d.Session.Session.Query(stmt, args...)
-			if err = q.Exec(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	q := d.EntityInfo.Table.InsertQuery(d.Session)
-	defer func() {
-		if q != nil {
-			q.Release()
-		}
-	}()
-	for _, entity := range entities {
-		q.BindStruct(entity)
-		if err := q.Exec(); err != nil {
-			return err
-		}
-	}
-	return nil
+	return d.saveManyInBatches(entities, 0, false)
 }
 
 // SaveManyWithTTL inserts multiple entities with the same per-row TTL.
@@ -209,26 +191,7 @@ func (d *BaseScyllaRepository) SaveManyWithTTL(entities []cqlxoEntity.BaseScylla
 		return NoSessionError
 	}
 
-	stmt := d.getInsertStmtWithTTL()
-	var q *gocql.Query
-	defer func() {
-		if q != nil {
-			q.Release()
-		}
-	}()
-
-	for _, entity := range entities {
-		args, err := d.getInsertArgs(entity)
-		if err != nil {
-			return err
-		}
-		args = append(args, ttl)
-		q = d.Session.Session.Query(stmt, args...)
-		if err = q.Exec(); err != nil {
-			return err
-		}
-	}
-	return nil
+	return d.saveManyInBatches(entities, ttl, true)
 }
 
 func (d *BaseScyllaRepository) hasTupleColumn() bool {
@@ -313,6 +276,70 @@ func (d *BaseScyllaRepository) getColumnInfo(colName string) (cqlxoCodec.ColumnI
 		}
 	}
 	return cqlxoCodec.ColumnInfo{}, false
+}
+
+func (d *BaseScyllaRepository) saveManyInBatches(entities []cqlxoEntity.BaseScyllaEntityInterface, ttl int64, useTTL bool) error {
+	if len(entities) == 0 {
+		return nil
+	}
+
+	batchSize := d.getBatchChunkSize()
+	batchType := d.getBatchType()
+
+	stmt := d.getInsertStmt()
+	if useTTL {
+		stmt = d.getInsertStmtWithTTL()
+	}
+
+	for start := 0; start < len(entities); start += batchSize {
+		end := min(start+batchSize, len(entities))
+		batch := d.newBatch(batchType)
+
+		for _, entity := range entities[start:end] {
+			args, err := d.getInsertArgs(entity)
+			if err != nil {
+				return err
+			}
+			if useTTL {
+				args = append(args, ttl)
+			}
+			batch.Query(stmt, args...)
+		}
+
+		if err := d.executeBatch(batch); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *BaseScyllaRepository) getBatchChunkSize() int {
+	if d.BatchConfig != nil && d.BatchConfig.ChunkSize > 0 {
+		return d.BatchConfig.ChunkSize
+	}
+	return defaultBatchChunkSize
+}
+
+func (d *BaseScyllaRepository) getBatchType() gocql.BatchType {
+	if d.BatchConfig == nil {
+		return defaultBatchType
+	}
+
+	switch d.BatchConfig.Type {
+	case gocql.LoggedBatch, gocql.UnloggedBatch, gocql.CounterBatch:
+		return d.BatchConfig.Type
+	default:
+		return defaultBatchType
+	}
+}
+
+func (d *BaseScyllaRepository) newBatch(batchType gocql.BatchType) *gocql.Batch {
+	return d.Session.Session.Batch(batchType)
+}
+
+func (d *BaseScyllaRepository) executeBatch(batch *gocql.Batch) error {
+	return d.Session.Session.ExecuteBatch(batch)
 }
 
 func (d *BaseScyllaRepository) selectRelease(q *gocqlx.Queryx, result interface{}) error {

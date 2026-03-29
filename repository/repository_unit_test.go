@@ -4,7 +4,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/gocql/gocql"
 	cqlxoCodec "github.com/saivnct/gocqlx-orm/codec"
+	cqlxoEntity "github.com/saivnct/gocqlx-orm/entity"
+	"github.com/scylladb/gocqlx/v3"
 	"github.com/scylladb/gocqlx/v3/table"
 )
 
@@ -101,4 +104,61 @@ func TestGetInsertStmtWithTTL_AppendsUsingTTL(t *testing.T) {
 	if stmt != expected {
 		t.Fatalf("unexpected statement:\n got: %s\nwant: %s", stmt, expected)
 	}
+}
+
+func TestBatchConfig_FallbackToDefaultsWhenInvalid(t *testing.T) {
+	d := newBatchTestRepository()
+	d.SetBatchSaveConfig(BatchSaveConfig{
+		ChunkSize: 0,
+		Type:      gocql.BatchType(99),
+	})
+
+	if size := d.getBatchChunkSize(); size != defaultBatchChunkSize {
+		t.Fatalf("expected default chunk size %d, got %d", defaultBatchChunkSize, size)
+	}
+	if batchType := d.getBatchType(); batchType != defaultBatchType {
+		t.Fatalf("expected default batch type %v, got %v", defaultBatchType, batchType)
+	}
+}
+
+func TestSaveMany_WithoutSessionReturnsNoSessionError(t *testing.T) {
+	d := &BaseScyllaRepository{}
+
+	err := d.SaveMany(makeQueryEntities(1))
+	if !errors.Is(err, NoSessionError) {
+		t.Fatalf("expected NoSessionError, got %v", err)
+	}
+}
+
+func newBatchTestRepository() *BaseScyllaRepository {
+	return &BaseScyllaRepository{
+		EntityInfo: cqlxoCodec.EntityInfo{
+			TableMetaData: table.Metadata{
+				Name:    "query_entity",
+				Columns: []string{"id", "name"},
+			},
+			Columns: []cqlxoCodec.ColumnInfo{
+				{Name: "id", Type: gocql.NewNativeType(0, gocql.TypeText)},
+				{Name: "name", Type: gocql.NewNativeType(0, gocql.TypeText)},
+			},
+			ColumFieldMap: map[string]string{
+				"id":   "ID",
+				"name": "Name",
+			},
+		},
+		Session: gocqlx.Session{
+			Session: &gocql.Session{},
+		},
+	}
+}
+
+func makeQueryEntities(n int) []cqlxoEntity.BaseScyllaEntityInterface {
+	entities := make([]cqlxoEntity.BaseScyllaEntityInterface, 0, n)
+	for i := 0; i < n; i++ {
+		entities = append(entities, &queryEntity{
+			ID:   "id",
+			Name: "name",
+		})
+	}
+	return entities
 }
