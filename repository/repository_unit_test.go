@@ -130,12 +130,131 @@ func TestSaveMany_WithoutSessionReturnsNoSessionError(t *testing.T) {
 	}
 }
 
+func TestDeleteManyByPrimaryKey_UsesBatchExecutionWithDefaultConfig(t *testing.T) {
+	d := newBatchTestRepository()
+	var executedBatches []*gocql.Batch
+
+	d.newBatchFn = func(batchType gocql.BatchType) *gocql.Batch {
+		return &gocql.Batch{Type: batchType}
+	}
+	d.executeBatchFn = func(batch *gocql.Batch) error {
+		executedBatches = append(executedBatches, batch)
+		return nil
+	}
+
+	entities := makeQueryEntities(120)
+	if err := d.DeleteManyByPrimaryKey(entities); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(executedBatches) != 3 {
+		t.Fatalf("expected 3 batches, got %d", len(executedBatches))
+	}
+
+	expectedStmt := "DELETE FROM query_entity WHERE id = ? AND name = ?"
+	expectedSizes := []int{50, 50, 20}
+	for i, batch := range executedBatches {
+		if batch.Type != gocql.UnloggedBatch {
+			t.Fatalf("expected default unlogged batch type, got %v", batch.Type)
+		}
+		if len(batch.Entries) != expectedSizes[i] {
+			t.Fatalf("batch %d expected %d entries, got %d", i, expectedSizes[i], len(batch.Entries))
+		}
+		for _, entry := range batch.Entries {
+			if entry.Stmt != expectedStmt {
+				t.Fatalf("unexpected stmt, got %q want %q", entry.Stmt, expectedStmt)
+			}
+			if len(entry.Args) != 2 {
+				t.Fatalf("expected 2 args for primary-key delete, got %d", len(entry.Args))
+			}
+		}
+	}
+}
+
+func TestDeleteManyByPrimaryKey_UsesCustomBatchConfig(t *testing.T) {
+	d := newBatchTestRepository()
+	var executedBatches []*gocql.Batch
+
+	d.SetBatchSaveConfig(BatchSaveConfig{
+		ChunkSize: 2,
+		Type:      gocql.LoggedBatch,
+	})
+	d.newBatchFn = func(batchType gocql.BatchType) *gocql.Batch {
+		return &gocql.Batch{Type: batchType}
+	}
+	d.executeBatchFn = func(batch *gocql.Batch) error {
+		executedBatches = append(executedBatches, batch)
+		return nil
+	}
+
+	if err := d.DeleteManyByPrimaryKey(makeQueryEntities(5)); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(executedBatches) != 3 {
+		t.Fatalf("expected 3 batches, got %d", len(executedBatches))
+	}
+	for _, batch := range executedBatches {
+		if batch.Type != gocql.LoggedBatch {
+			t.Fatalf("expected logged batch type, got %v", batch.Type)
+		}
+	}
+}
+
+func TestDeleteManyByPrimaryKey_RejectsInvalidPrimaryKey(t *testing.T) {
+	d := newBatchTestRepository()
+	d.newBatchFn = func(batchType gocql.BatchType) *gocql.Batch {
+		return &gocql.Batch{Type: batchType}
+	}
+	d.executeBatchFn = func(batch *gocql.Batch) error {
+		return nil
+	}
+
+	err := d.DeleteManyByPrimaryKey([]cqlxoEntity.BaseScyllaEntityInterface{
+		queryEntity{ID: "id-only"},
+	})
+	if !errors.Is(err, InvalidPrimaryKey) {
+		t.Fatalf("expected InvalidPrimaryKey, got %v", err)
+	}
+}
+
+func TestDeleteManyByPrimaryKey_EmptyInputDoesNotExecuteBatch(t *testing.T) {
+	d := newBatchTestRepository()
+	executed := false
+
+	d.newBatchFn = func(batchType gocql.BatchType) *gocql.Batch {
+		return &gocql.Batch{Type: batchType}
+	}
+	d.executeBatchFn = func(batch *gocql.Batch) error {
+		executed = true
+		return nil
+	}
+
+	if err := d.DeleteManyByPrimaryKey(nil); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if executed {
+		t.Fatalf("expected no batch execution for empty input")
+	}
+}
+
+func TestDeleteManyByPrimaryKey_WithoutSessionReturnsNoSessionError(t *testing.T) {
+	d := &BaseScyllaRepository{}
+
+	err := d.DeleteManyByPrimaryKey(makeQueryEntities(1))
+	if !errors.Is(err, NoSessionError) {
+		t.Fatalf("expected NoSessionError, got %v", err)
+	}
+}
+
 func newBatchTestRepository() *BaseScyllaRepository {
 	return &BaseScyllaRepository{
 		EntityInfo: cqlxoCodec.EntityInfo{
 			TableMetaData: table.Metadata{
 				Name:    "query_entity",
 				Columns: []string{"id", "name"},
+				PartKey: []string{"id"},
+				SortKey: []string{"name"},
 			},
 			Columns: []cqlxoCodec.ColumnInfo{
 				{Name: "id", Type: gocql.NewNativeType(0, gocql.TypeText)},

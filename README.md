@@ -25,7 +25,7 @@ It reduces repetitive schema and CRUD boilerplate by deriving table metadata dir
   - `SaveWithTTL`, `SaveManyWithTTL`
   - `FindAll`, `Find`, `FindByPrimaryKey`, `FindByPartitionKey`, `FindWithOption`
   - `CountAll`, `Count`
-  - `DeleteAll`, `DeleteByPrimaryKey`, `DeleteByPartitionKey`
+  - `DeleteAll`, `DeleteByPrimaryKey`, `DeleteManyByPrimaryKey`, `DeleteByPartitionKey`
 
 ## Installation
 
@@ -114,9 +114,9 @@ TTL validation behavior:
 - `ttl <= 0` returns `cqlxoRepository.InvalidTTL`
 - TTL is applied per written row using `INSERT ... USING TTL ?`
 
-### 6. Configure Batch Save Behavior
+### 6. Configure Batch Write/Delete Behavior
 
-`SaveMany` and `SaveManyWithTTL` use CQL batch execution with safe defaults:
+`SaveMany`, `SaveManyWithTTL`, and `DeleteManyByPrimaryKey` use CQL batch execution with safe defaults:
 
 - default chunk size: `50`
 - default batch type: `gocql.UnloggedBatch`

@@ -18,6 +18,9 @@ const (
 	batchSaveTotalPackages        = 300
 	batchSaveDefaultPathPackages  = 62
 	batchSaveFallbackPathPackages = 9
+	batchDeleteChunkSize          = 40
+	batchDeleteTotalPackages      = 120
+	batchDeleteCount              = 73
 	batchSaveTTLChunkSize         = 50
 	batchSaveTTLSeconds           = 30
 	batchSaveTotalDocs            = 300
@@ -181,6 +184,69 @@ func TestExample07_BatchSaveWithTTL_CustomConfig(t *testing.T) {
 	}
 }
 
+func TestExample07_BatchDeleteByPrimaryKey_CustomConfig_And_DefaultPath(t *testing.T) {
+	keyspace := newBatchSaveKeyspace("example_07_batch_delete")
+	err := SetUpKeySpace(keyspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	session := openTestSession(t, keyspace)
+	defer func() {
+		CleanUp(session, keyspace)
+		session.Close()
+	}()
+
+	repo, err := mPackageRepository(session)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entities, byID, _ := buildPackagesForBatchSave(batchDeleteTotalPackages)
+	err = repo.SaveMany(entities)
+	assert.NoError(t, err)
+
+	countAll, err := repo.CountAll()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(batchDeleteTotalPackages), countAll)
+
+	repo.SetBatchSaveConfig(cqlxoRepository.BatchSaveConfig{
+		ChunkSize: batchDeleteChunkSize,
+		Type:      gocql.LoggedBatch,
+	})
+
+	toDelete := buildDeleteQueryEntities(entities[:batchDeleteCount])
+	err = repo.DeleteManyByPrimaryKey(toDelete)
+	assert.NoError(t, err)
+
+	countAll, err = repo.CountAll()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(batchDeleteTotalPackages-batchDeleteCount), countAll)
+
+	for i := 0; i < batchDeleteCount; i++ {
+		deletedID := entities[i].(*Package).Id
+		var deletedResult []*Package
+		err = repo.FindByPrimaryKey(Package{Id: deletedID}, &deletedResult)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, len(deletedResult))
+	}
+
+	remainingID := entities[batchDeleteCount].(*Package).Id
+	var remainingResult []*Package
+	err = repo.FindByPrimaryKey(Package{Id: remainingID}, &remainingResult)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(remainingResult))
+	assert.Equal(t, byID[remainingID].Name, remainingResult[0].Name)
+
+	remainingQueries := buildDeleteQueryEntities(entities[batchDeleteCount:])
+	err = repo.DeleteManyByPrimaryKey(remainingQueries)
+	assert.NoError(t, err)
+
+	countAll, err = repo.CountAll()
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), countAll)
+}
+
 func buildPackagesForBatchSave(total int) ([]cqlxoEntity.BaseScyllaEntityInterface, map[gocql.UUID]*Package, []string) {
 	entities := make([]cqlxoEntity.BaseScyllaEntityInterface, 0, total)
 	byID := make(map[gocql.UUID]*Package, total)
@@ -227,6 +293,18 @@ func buildDocsForBatchTTL(total int) ([]cqlxoEntity.BaseScyllaEntityInterface, m
 	}
 
 	return entities, byID
+}
+
+func buildDeleteQueryEntities(entities []cqlxoEntity.BaseScyllaEntityInterface) []cqlxoEntity.BaseScyllaEntityInterface {
+	queryEntities := make([]cqlxoEntity.BaseScyllaEntityInterface, 0, len(entities))
+	for _, entity := range entities {
+		pkg, ok := entity.(*Package)
+		if !ok {
+			continue
+		}
+		queryEntities = append(queryEntities, Package{Id: pkg.Id})
+	}
+	return queryEntities
 }
 
 func openTestSession(t *testing.T, keyspace string) gocqlx.Session {

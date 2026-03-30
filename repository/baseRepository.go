@@ -28,6 +28,9 @@ type BaseScyllaRepository struct {
 	Session    gocqlx.Session
 
 	BatchConfig *BatchSaveConfig
+	//user these Fn for mock testing only
+	newBatchFn     func(batchType gocql.BatchType) *gocql.Batch
+	executeBatchFn func(batch *gocql.Batch) error
 }
 
 const (
@@ -335,10 +338,18 @@ func (d *BaseScyllaRepository) getBatchType() gocql.BatchType {
 }
 
 func (d *BaseScyllaRepository) newBatch(batchType gocql.BatchType) *gocql.Batch {
+	if d.newBatchFn != nil {
+		//when mock test enable
+		return d.newBatchFn(batchType)
+	}
 	return d.Session.Session.Batch(batchType)
 }
 
 func (d *BaseScyllaRepository) executeBatch(batch *gocql.Batch) error {
+	if d.executeBatchFn != nil {
+		//when mock test enable
+		return d.executeBatchFn(batch)
+	}
 	return d.Session.Session.ExecuteBatch(batch)
 }
 
@@ -664,6 +675,47 @@ func (d *BaseScyllaRepository) DeleteByPrimaryKey(queryEntity cqlxoEntity.BaseSc
 	return q.ExecRelease()
 }
 
+func (d *BaseScyllaRepository) DeleteManyByPrimaryKey(queryEntities []cqlxoEntity.BaseScyllaEntityInterface) error {
+	if d.Session.Session == nil {
+		return NoSessionError
+	}
+	if len(queryEntities) == 0 {
+		return nil
+	}
+
+	if len(d.EntityInfo.TableMetaData.PartKey) == 0 {
+		return InvalidPrimaryKey
+	}
+
+	keys := append(append([]string{}, d.EntityInfo.TableMetaData.PartKey...), d.EntityInfo.TableMetaData.SortKey...)
+	if len(keys) == 0 {
+		return InvalidPrimaryKey
+	}
+
+	stmt := d.getDeleteByPrimaryKeyStmt(keys)
+	batchSize := d.getBatchChunkSize()
+	batchType := d.getBatchType()
+
+	for start := 0; start < len(queryEntities); start += batchSize {
+		end := min(start+batchSize, len(queryEntities))
+		batch := d.newBatch(batchType)
+
+		for _, queryEntity := range queryEntities[start:end] {
+			args, err := d.getPrimaryKeyArgs(queryEntity, keys)
+			if err != nil {
+				return err
+			}
+			batch.Query(stmt, args...)
+		}
+
+		if err := d.executeBatch(batch); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (d *BaseScyllaRepository) DeleteByPartitionKey(queryEntity cqlxoEntity.BaseScyllaEntityInterface) error {
 	if d.Session.Session == nil {
 		return NoSessionError
@@ -719,6 +771,54 @@ func (d *BaseScyllaRepository) getQueryMap(queryEntity cqlxoEntity.BaseScyllaEnt
 		}
 	}
 	return queryMap
+}
+
+func (d *BaseScyllaRepository) getDeleteByPrimaryKeyStmt(keys []string) string {
+	conditions := make([]string, 0, len(keys))
+	for _, key := range keys {
+		conditions = append(conditions, fmt.Sprintf("%s = ?", key))
+	}
+	return fmt.Sprintf("DELETE FROM %s WHERE %s", d.EntityInfo.TableMetaData.Name, strings.Join(conditions, " AND "))
+}
+
+func (d *BaseScyllaRepository) getPrimaryKeyArgs(queryEntity cqlxoEntity.BaseScyllaEntityInterface, keys []string) ([]interface{}, error) {
+	if queryEntity == nil {
+		return nil, NoQueryEntityError
+	}
+
+	v := reflect.ValueOf(queryEntity)
+	for v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil, InvalidPrimaryKey
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil, InvalidPrimaryKey
+	}
+
+	args := make([]interface{}, 0, len(keys))
+	for _, key := range keys {
+		fieldName, ok := d.EntityInfo.ColumFieldMap[key]
+		if !ok || fieldName == "" {
+			return nil, InvalidPrimaryKey
+		}
+
+		fieldValue := v.FieldByName(fieldName)
+		if !fieldValue.IsValid() {
+			return nil, InvalidPrimaryKey
+		}
+
+		fieldType := fieldValue.Type()
+		if reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(fieldType).Interface()) {
+			return nil, InvalidPrimaryKey
+		}
+
+		colInfo, _ := d.getColumnInfo(key)
+		args = append(args, cqlxoCodec.WrapValueForWrite(colInfo.Type, fieldValue, d.mapper()))
+	}
+
+	return args, nil
 }
 
 // Cmp if a filtering comparator that is used in WHERE and IF clauses.
